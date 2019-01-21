@@ -1,19 +1,12 @@
 package pvt.psk.jcore.utils
 
 import java.util.*
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.*
+
+val cnt: AtomicLong = AtomicLong((UUID.randomUUID().hashCode().toLong() shl 32))
 
 class AckToken
 {
-    companion object
-    {
-        @JvmStatic
-        val cnt: AtomicLong = AtomicLong((UUID.randomUUID().hashCode().toLong() shl 32))
-
-        @JvmStatic
-        fun New(): AckToken = AckToken()
-    }
-
     val ID: Long = cnt.incrementAndGet()
 
     override fun equals(other: Any?): Boolean
