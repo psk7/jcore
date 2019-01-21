@@ -37,7 +37,7 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
         if (fh != selfHostID && th != selfHostID)
             return
 
-        onControlReceived(packet, fh);
+        onControlReceived(packet, fh)
     }
 
     protected open fun onControlReceived(packet: Message, fromHost: HostID) {
@@ -53,16 +53,16 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
 
     private fun onDiscovery(fromHost: HostID) {
 
-        var tgt = fromHost;
+        var tgt = fromHost
 
-        val isHostKnown = hosts.containsKey(tgt);
+        val isHostKnown = hosts.containsKey(tgt)
 
-        sendHostInfo(tgt);
+        sendHostInfo(tgt)
 
         if (isHostKnown)
-            return;
+            return
 
-        controlChannel.sendMessage(DiscoveryCommand(selfHostID, tgt));
+        controlChannel.sendMessage(DiscoveryCommand(selfHostID, tgt))
     }
 
     private fun onHostInfo(HostInfo: HostInfoCommand, FromHost: HostID) {
@@ -79,16 +79,16 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
             } else if (HostInfo.SequenceID <= hd!!.lastSequenceID)
                 return
 
-            hd.lastSequenceID = HostInfo.SequenceID;
+            hd.lastSequenceID = HostInfo.SequenceID
         }
 
         if (!isHostKnown) {
-            logger?.writeLog(LogImportance.Info, logCat, "В домене обнаружен хост {$FromHost}");
+            logger?.writeLog(LogImportance.Info, logCat, "В домене обнаружен хост {$FromHost}")
 
-            onNewHost(FromHost);
+            onNewHost(FromHost)
         }
 
-        ProcessHostInfoCommand(HostInfo);
+        ProcessHostInfoCommand(HostInfo)
 
         onHostInfo(HostInfo)
     }
@@ -98,9 +98,9 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
         val rl = synchronized(hosts) { hosts.remove(LeavingHost) != null }
 
         if (rl)
-            logger?.writeLog(LogImportance.Info, logCat, "Хост {$LeavingHost} покидает домен");
+            logger?.writeLog(LogImportance.Info, logCat, "Хост {$LeavingHost} покидает домен")
 
-        onLeaveHost(LeavingHost);
+        onLeaveHost(LeavingHost)
     }
 
     protected open fun onHostInfo(Command: HostInfoCommand): Unit = Unit
@@ -109,13 +109,13 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
 
     fun sendHostInfo(ToHost: HostID) {
 
-        logger?.writeLog(LogImportance.Info, logCat, "Отправка информации о каналах");
+        logger?.writeLog(LogImportance.Info, logCat, "Отправка информации о каналах")
 
-        var np = createPollCommand();
+        var np = createPollCommand()
 
-        controlChannel.sendMessage(np);
+        controlChannel.sendMessage(np)
 
-        controlChannel.sendHostInfo(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, ToHost));
+        controlChannel.sendHostInfo(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, ToHost))
     }
 
     protected fun adjustTargetHost(From: HostID, To: HostID): Pair<Boolean, HostID> {
@@ -129,7 +129,7 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
         var to = To
 
         if (To == HostID.All || To == selfHostID)
-            to = HostID.Local;
+            to = HostID.Local
 
         return Pair(true, to)
     }
