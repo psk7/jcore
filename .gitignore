@@ -1,0 +1,6 @@
+.idea
+.svn
+.gradle
+
+build/
+out/

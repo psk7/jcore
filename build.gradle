@@ -1,0 +1,40 @@
+plugins
+{
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.11'
+}
+
+group 'pvt.psk'
+version '1.0-SNAPSHOT'
+
+repositories
+{
+    mavenCentral()
+}
+
+dependencies
+{
+    testImplementation('org.junit.jupiter:junit-jupiter-api:5.1.0')
+    testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5.1.0')
+
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.0"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+}
+
+test
+{
+    useJUnitPlatform
+    {
+        includeEngines 'junit-jupiter' //, 'junit-vintage'
+    }
+}
+
+compileKotlin
+{
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin
+{
+    kotlinOptions.jvmTarget = "1.8"
+}
