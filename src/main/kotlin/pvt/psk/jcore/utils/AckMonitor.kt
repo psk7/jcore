@@ -1,37 +1,23 @@
 package pvt.psk.jcore.utils
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.*
+import pvt.psk.jcore.utils.AckToken.Companion.New
 import java.util.concurrent.*
 
-import pvt.psk.jcore.utils.AckToken.Companion.New
+val _lst = ConcurrentHashMap<AckToken, CompletableDeferred<Any>>()
 
-class AckMonitor<T>
-{
-    companion object
-    {
-        @JvmStatic
-        private var _lst: ConcurrentMap<AckToken, CompletableDeferred<BinaryReader>> =
-            ConcurrentHashMap<AckToken, CompletableDeferred<BinaryReader>>()
+fun <T> register(): Pair<AckToken, Deferred<T>> {
+    val tk = New()
+    val cd = CompletableDeferred<Any>()
 
-        @JvmStatic
-        fun Register(): Pair<AckToken, Deferred<BinaryReader>>
-        {
-            val tk = New()
-            val cd = CompletableDeferred<BinaryReader>()
+    _lst[tk] = cd
 
-            _lst[tk] = cd
+    return Pair(tk, GlobalScope.async { cd.await() as T })
+}
 
-            return Pair(tk, cd)
-        }
+fun <T> received(Token: AckToken, Data: T) {
+    val cd = _lst[Token] ?: return
 
-        @JvmStatic
-        fun Received(Token: AckToken, Data: BinaryReader)
-        {
-            val cd = _lst[Token] ?: return
-
-            cd.complete(Data)
-            _lst.remove(Token)
-        }
-    }
+    cd.complete(Data as Any)
+    _lst.remove(Token)
 }

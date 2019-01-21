@@ -29,9 +29,9 @@ class HostID
     companion object
     {
         val All: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000000"), "*")
-        val Local: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000001"), "*")
-        val Network: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000002"), "*")
-        val Unknown: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000003"), "*")
+        val Local: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Local")
+        val Network: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000002"), "Network")
+        val Unknown: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000003"), "Unknown")
     }
 
     override fun equals(other: Any?): Boolean
