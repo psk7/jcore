@@ -1,8 +1,6 @@
 package pvt.psk.jcore.remoting
 
 import pvt.psk.jcore.utils.*
-import java.lang.annotation.*
-import java.lang.annotation.Target
 import java.lang.reflect.*
 
 fun getMethodID(Method: Method): MethodID {
@@ -34,5 +32,5 @@ class MethodID(val ID: Int, val Name: String) {
 
 }
 
-@Target(ElementType.METHOD)
+@Target(AnnotationTarget.FUNCTION)
 annotation class MethodIdVal(val ID: Int)
