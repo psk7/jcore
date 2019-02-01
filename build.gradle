@@ -1,6 +1,7 @@
 plugins
 {
-    id 'java'
+    //id 'java'
+    id 'application'
     id 'org.jetbrains.kotlin.jvm' version '1.3.11'
 }
 
@@ -18,9 +19,20 @@ dependencies
     testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5.+')
 
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.+"
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-
+    //compile "org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.26.1"
+    //compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     //compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-io-jvm', version: '0.1.3'
+}
+
+sourceSets{
+    contest {
+        compileClasspath += main.output
+        runtimeClasspath += main.output
+    }
+}
+
+configurations {
+    contestCompile { extendsFrom(compile) }
 }
 
 test
@@ -29,6 +41,10 @@ test
     {
         includeEngines 'junit-jupiter' //, 'junit-vintage'
     }
+}
+
+compileContestKotlin{
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 compileKotlin

@@ -8,7 +8,7 @@ import java.util.concurrent.*
 import pvt.psk.jcore.utils.*
 import java.util.concurrent.atomic.*
 
-abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val controlChannel: IChannel, val logger: Logger?) {
+abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val controlChannel: IChannel, val logger: Logger?) : IPeerCommandFactory {
     val logCat: String = "Peer"
 
     data class HostData(var lastSequenceID: Int)

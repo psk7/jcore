@@ -12,11 +12,11 @@ internal interface A {
 }
 
 internal class Transport : IMethodInvoker {
-    override fun InvokeAsync(MethodID: MethodID, Arguments: Arguments): Deferred<Any?> {
+    override fun invokeAsync(MethodID: MethodID, Arguments: Arguments): Deferred<Any?> {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    override fun Invoke(MethodID: MethodID, Arguments: Arguments): Any? {
+    override fun invoke(MethodID: MethodID, Arguments: Arguments): Any? {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 }
@@ -25,9 +25,7 @@ class RemoteMethodProxyTest {
 
     @Test
     fun create() {
-        val pf = RemoteMethodProxyFactory()
-
-        val oa = pf.create(Transport(), A::class.java) as A
+        val oa = createMethodProxy<A>(Transport())
 
         assertNotNull(oa)
     }

@@ -20,10 +20,11 @@ class MethodsMapTest {
 
     @Test
     fun createMethodsMap() {
-        val mm = MethodsMap(obj().javaClass)
+        val o = obj()
+        val mm = MethodsMap(o.javaClass)
         val m = HashMap<MethodID, Method>()
 
-        mm.buildInterfaceMap(IIntf::class.java, m.javaClass, m)
+        mm.buildInterfaceMap(IIntf::class.java, o.javaClass, m)
 
         assertEquals(1, m.count())
         assertEquals(10, m.keys.toList()[0].ID)

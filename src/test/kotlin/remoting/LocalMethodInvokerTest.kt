@@ -20,7 +20,7 @@ class LocalMethodInvokerTest {
         val o = M();
         val lmi = LocalMethodInvoker(o)
 
-        val res = lmi.Invoke(MethodID(10, "MAdd"), Arguments(arrayOf(10, 20)))
+        val res = lmi.invoke(MethodID(10, "MAdd"), Arguments(arrayOf(10, 20)))
 
         assertEquals(30.toDouble(), res)
     }

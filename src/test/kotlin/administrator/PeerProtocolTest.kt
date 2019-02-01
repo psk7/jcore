@@ -7,13 +7,22 @@ import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.HostID
 import pvt.psk.jcore.logger.*
+import pvt.psk.jcore.utils.*
+import java.time.*
 import java.util.*
 
 private class TestLogger(val prefix: String) : Logger() {
+    override fun writeLog(TimeStamp: LocalDateTime, importance: LogImportance, logCat: String, message: String) {
+        println(message)
+    }
 }
 
 private class TestPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IChannel, logger: Logger?) :
     PeerProtocol(selfHostID, domain, controlChannel, logger) {
+
+    override fun serialize(Command: PeerCommand, Writer: BinaryWriter) {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
 
     override fun ProcessHostInfoCommand(Command: HostInfoCommand) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.

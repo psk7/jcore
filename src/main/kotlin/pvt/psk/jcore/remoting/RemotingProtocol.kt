@@ -5,7 +5,7 @@ import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 
-class RemotingProtocol(val remotingChannel: IChannel, val selfHostID: HostID, val factory: IMethodProxyFactory, log: Logger?) {
+class RemotingProtocol(val remotingChannel: IChannel, val selfHostID: HostID, log: Logger?) {
 
     data class MethodInvokerBag(val invoker: IMethodInvoker, val isLocal: Boolean)
 
