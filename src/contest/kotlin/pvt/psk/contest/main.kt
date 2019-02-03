@@ -1,5 +1,6 @@
 package pvt.psk.contest
 
+import kotlinx.coroutines.*
 import pvt.psk.jcore.logger.*
 import java.io.Console
 
@@ -35,4 +36,6 @@ fun main(args: Array<String>) {
 
     val inst = Instance(createId())
     inst.init()
+
+    runBlocking { delay(1000000) }
 }

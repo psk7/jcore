@@ -15,11 +15,10 @@ class RemotingProtocol(val remotingChannel: IChannel, val selfHostID: HostID, lo
     }
 
     fun createRequest(token: AckToken, taskID: TaskID, methodID: MethodID, arguments: Arguments): ByteArray {
-        val ms = MemoryStream()
-        val wr = BinaryWriter(ms)
+        val wr = BinaryWriter()
 
-        wr.Write(PacketID.Invoke as Byte)
-        token.ToStream(ms)
+        wr.write(PacketID.Invoke.ordinal.toByte())
+        token.toStream(wr.baseStream)
         taskID.Serialize(wr)
         methodID.Serialize(wr)
         //Arguments.Formatter.Serialize(ms, Arguments)

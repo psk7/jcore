@@ -21,14 +21,13 @@ abstract class PeerCommandSocket protected constructor(val Bus: IChannel,
         if (data !is PeerCommand || !data.ToHost.isNetwork)
             return
 
-        Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды {$data}. Хосту ${data.ToHost}")
+        Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды $data. Хосту ${data.ToHost}")
 
-        var ms = MemoryStream()
-        var wr = BinaryWriter(ms)
+        var wr = BinaryWriter()
 
         CommandFactory.serialize(data, wr)
 
-        var dg = ms.toArray()
+        var dg = wr.toArray()
 
         send(dg, data.ToHost)
     }
@@ -37,7 +36,7 @@ abstract class PeerCommandSocket protected constructor(val Bus: IChannel,
 
     protected fun onReceive(Message :Message)
     {
-        Log?.writeLog(LogImportance.Trace, LogCat, "Принята команда {$Message} для {${Message.ToHost}}");
+        Log?.writeLog(LogImportance.Trace, LogCat, "Принята команда $Message для ${Message.ToHost}")
 
         Bus.sendMessage(Message);
     }

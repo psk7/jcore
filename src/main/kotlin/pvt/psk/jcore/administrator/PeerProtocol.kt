@@ -16,6 +16,10 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
     val hosts = ConcurrentHashMap<HostID, HostData>()
     val curseqid = AtomicInteger(1)
 
+    init {
+        controlChannel.filterLocal().received += { (c, d) -> controlReceived(c, d) }
+    }
+
     // Control.FilterLocal().OnDataReceived += ControlReceived;
 
     fun discovery() = controlChannel.sendMessage(DiscoveryCommand(selfHostID, HostID.Network))

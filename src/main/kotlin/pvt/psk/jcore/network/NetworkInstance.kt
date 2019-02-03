@@ -16,7 +16,7 @@ open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: 
         val cs = NetworkCommandSocket(ControlBus.getChannel(), AdmPort, Log, PeerProto, CancellationToken)
         cs.IgnoreFromHost = HostID
 
-        cs.BeginReceive()
+        //cs.BeginReceive()
 
         return cs
     }

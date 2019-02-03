@@ -1,13 +1,16 @@
 package pvt.psk.jcore.network
 
+import io.ktor.network.selector.*
+import io.ktor.network.sockets.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.*
+import kotlinx.io.core.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 import java.nio.*
 import java.nio.channels.*
 
-class SafeUdpClient(val Selector: UdpSelector,
-                    val BindEndPoint: InetSocketAddress,
+class SafeUdpClient(val BindEndPoint: InetSocketAddress,
                     val CancellationToken: CancellationToken,
                     val IsMulticast: Boolean = false) {
 
@@ -43,24 +46,25 @@ class SafeUdpClient(val Selector: UdpSelector,
         operator fun minusAssign(m: (TS, TA) -> Unit)
     }
 
-    private var _udp: DatagramChannel? = null
-    private val _bb = ByteBuffer.allocateDirect(16384)
+    private val _udp: BoundDatagramSocket
 
     val received = Delegate<ByteArray, InetSocketAddress>()
 
     init {
 
-        try {
-            _udp = DatagramChannel.open().apply {
-                bind(BindEndPoint)
-                configureBlocking(false)
-                register(Selector.selector, SelectionKey.OP_READ, this@SafeUdpClient)
+        _udp = aSocket(ActorSelectorManager(Dispatchers.IO)).udp().bind(BindEndPoint) { reuseAddress = IsMulticast }
 
-                if (IsMulticast)
-                    setOption(StandardSocketOptions.SO_REUSEADDR, true)
-            }
-        }
-        catch (be: Exception) {
+        beginReceive()
+    }
+
+    private fun beginReceive() = GlobalScope.launch(Dispatchers.Unconfined) {
+        while (!CancellationToken.isCancellationRequested) {
+            val rp = _udp.incoming.receive()
+
+            val ba = ByteArray(rp.packet.remaining.toInt())
+            rp.packet.readAvailable(ba)
+
+            launch(Dispatchers.Default) { onReceived(ba, rp.address as InetSocketAddress) }
         }
     }
 
@@ -68,23 +72,9 @@ class SafeUdpClient(val Selector: UdpSelector,
         received.invoke(Data, From)
     }
 
-    fun processOnReceived() {
-        val from = _udp?.receive(_bb) as InetSocketAddress ?: return
-
-        val ba = ByteArray(_bb.position())
-
-        _bb.run {
-            rewind()
-            get(ba)
-            clear()
-        }
-
-        GlobalScope.launch { onReceived(ba, from) }
-    }
-
     fun send(data: ByteArray, target: SocketAddress) {
-        _udp?.send(ByteBuffer.wrap(data), target)
+        _udp.outgoing.sendBlocking(Datagram(ByteReadPacket(data), target))
     }
 
-    fun localEndPoint(): SocketAddress = _udp?.localAddress ?: throw Exception()
+    fun localEndPoint(): SocketAddress = _udp.localAddress
 }

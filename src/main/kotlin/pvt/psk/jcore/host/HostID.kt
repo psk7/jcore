@@ -19,7 +19,7 @@ class HostID {
     }
 
     constructor(Reader: BinaryReader) {
-        ID = Reader.ReadUUID()
+        ID = Reader.readUUID()
         Name = Reader.ReadString()
     }
 
@@ -46,4 +46,9 @@ class HostID {
     }
 
     override fun toString(): String = "$Name<${ID.toString().subSequence(0, 8)}>"
+
+    fun serialize(writer: BinaryWriter) {
+        writer.write(ID)
+        writer.write(Name)
+    }
 }

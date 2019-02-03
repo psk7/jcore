@@ -11,9 +11,9 @@ class AckMonitorTest
     fun Test() = runBlocking {
         val (tk, j) = register<BinaryReader>()
 
-        val br = BinaryReader()
+        val br = BinaryReader(byteArrayOf())
 
-        GlobalScope.launch { received(tk, br) }
+        launch { received(tk, br) }
 
         val z = j.await()
 

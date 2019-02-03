@@ -1,5 +1,7 @@
 package pvt.psk.jcore.network
 
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
@@ -7,31 +9,28 @@ import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
-import java.nio.channels.*
+import java.nio.*
 import java.util.concurrent.*
 
 class NetworkCommandSocket(Bus: IChannel,
                            AdmPort: Int,
                            Log: Logger?,
                            CommandFactory: IPeerCommandFactory,
-                           CancellationToken: CancellationToken) :
+                           private val CancellationToken: CancellationToken) :
     PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken) {
 
-    private val _mcastudp: SafeUdpClient
     private val _unicastudp: SafeUdpClient
+    private val _mcsocket: MulticastSocket
 
     private val _admpoints = ConcurrentHashMap<HostID, CommandEndPoints>()
-    private val _admhosts = ConcurrentHashMap<InetAddress, HostID>()
+    private val _admhosts = ConcurrentHashMap<InetSocketAddress, HostID>()
+
+    private val mtx = Mutex()
 
     var IgnoreFromHost: HostID? = null
 
     init {
-
-        val us = UdpSelector(Selector.open())
-        us.run()
-
-        _mcastudp = SafeUdpClient(us, InetSocketAddress("::", AdmPort), CancellationToken, true)
-        _unicastudp = SafeUdpClient(us, InetSocketAddress("::", AdmPort), CancellationToken, false)
+        _unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false)
 
         val cep = CommandEndPoints()
 
@@ -40,14 +39,70 @@ class NetworkCommandSocket(Bus: IChannel,
         _admpoints[HostID.All] = cep;
         _admpoints[HostID.Network] = cep;
 
-        _mcastudp.received += ::received
-        _unicastudp.received += ::received
+        _unicastudp.received += { data: ByteArray, from: InetSocketAddress ->
+            GlobalScope.launch(Dispatchers.Unconfined) {
+                received(data, from)
+            }
+        }
+
+        _mcsocket = MulticastSocket(AdmPort)
+        _mcsocket.joinGroup(InetAddress.getByName("FF02::1"))
+
+        BeginReceive()
     }
 
-    protected fun received(data: ByteArray, from: InetSocketAddress) {
+    override fun BeginReceive() {
+        GlobalScope.launch(Dispatchers.IO) {
+            val buf = ByteArray(16384)
+
+            while (!CancellationToken.isCancellationRequested) {
+                val dp = DatagramPacket(buf, buf.size)
+
+                _mcsocket.receive(dp)
+
+                val l = dp.length
+
+                if (l == 0)
+                    continue
+
+                val ba = ByteArray(l)
+                dp.data.copyInto(ba, endIndex = l)
+
+                launch(Dispatchers.Default) { received(ba, dp.socketAddress as InetSocketAddress) }
+            }
+        }
+    }
+
+    private suspend fun received(data: ByteArray, from: InetSocketAddress) {
         if (data.count() == 0)
             return
 
+        val rd = BinaryReader(data)
+
+        val cmd = CommandFactory.create(rd) ?: return
+
+        try {
+            mtx.lock()
+
+            if (cmd is HostInfoCommand)
+                cmd.setSourceIpAddress(from.address)
+
+            val ig = IgnoreFromHost
+
+            if (ig != null && ig == cmd.FromHost)
+                return
+
+            _admhosts.getOrPut(from) { cmd.FromHost }
+            _admpoints.getOrPut(cmd.FromHost) { CommandEndPoints().add(from) }
+
+            onReceive(cmd)
+        }
+        finally {
+            if (cmd is HostInfoCommand)
+                cmd.release()
+
+            mtx.unlock()
+        }
     }
 
     override fun send(datagram: ByteArray, target: HostID) {
@@ -57,12 +112,8 @@ class NetworkCommandSocket(Bus: IChannel,
         val epl = _admpoints[target] ?: return
         val send = epl.getPrimary() ?: return
 
-        Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды по адресу {$send}");
+        Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды по адресу $send");
 
         _unicastudp.send(datagram, send)
     }
-
-    override fun BeginReceive() {
-    }
-
 }

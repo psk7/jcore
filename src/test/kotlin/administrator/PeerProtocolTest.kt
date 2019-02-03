@@ -19,6 +19,9 @@ private class TestLogger(val prefix: String) : Logger() {
 
 private class TestPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IChannel, logger: Logger?) :
     PeerProtocol(selfHostID, domain, controlChannel, logger) {
+    override fun create(Reader: BinaryReader): PeerCommand? {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
 
     override fun serialize(Command: PeerCommand, Writer: BinaryWriter) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.

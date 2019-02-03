@@ -13,56 +13,49 @@ import java.util.concurrent.*
 class SafeUdpClientTest {
 
     @Test
-    fun test() {
+    fun test() = runBlocking {
+        withTimeout(1000) {
 
-        val sa = InetSocketAddress("::", 4567)
+            val sa = InetSocketAddress("::", 4567)
 
-        assertFalse(sa.isUnresolved)
+            assertFalse(sa.isUnresolved)
 
-        val us = UdpSelector(Selector.open())
+            val c = SafeUdpClient(sa, CancellationToken.None)
 
-        val c = SafeUdpClient(us, sa, CancellationToken.None)
+            val d = DatagramChannel.open()
+            d.bind(InetSocketAddress("::", 0))
 
-        val d = DatagramChannel.open()
-        d.bind(InetSocketAddress("::", 0))
+            val l = ConcurrentLinkedQueue<ByteArray>()
 
-        val l = ConcurrentLinkedQueue<ByteArray>()
+            c.received += { dd, _ -> l += dd }
 
-        c.received += { dd, _ -> l += dd }
+            runBlocking {
 
-        us.run()
-
-        runBlocking {
-
-            for (i in 1..5) {
-                d.send(ByteBuffer.wrap(byteArrayOf(i.toByte())), InetSocketAddress("::1", 4567))
-
-                if (i == 2)
+                for (i in 1..5) {
                     d.send(ByteBuffer.wrap(byteArrayOf(i.toByte())), InetSocketAddress("::1", 4567))
-                //delay(1)
+
+                    if (i == 2)
+                        d.send(ByteBuffer.wrap(byteArrayOf(i.toByte())), InetSocketAddress("::1", 4567))
+                    //delay(1)
+                }
+
+                while (l.size < 5)
+                    delay(1)
             }
 
-            while (l.size < 5)
-                delay(1)
+            for (bytes in l) {
+                print(bytes[0])
+            }
+
+            println()
         }
-
-        for (bytes in l) {
-            print(bytes[0])
-        }
-
-        println()
-
-        us.stop()
     }
 
     @Test
     fun two() {
-        val us = UdpSelector(Selector.open())
 
-        us.run()
-
-        val c1 = SafeUdpClient(us, InetSocketAddress("::", 0), CancellationToken.None)
-        val c2 = SafeUdpClient(us, InetSocketAddress("::", 0), CancellationToken.None)
+        val c1 = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken.None)
+        val c2 = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken.None)
 
         c1.received += { d, a -> println("$d from $a in c1") }
         c2.received += { d, a -> println("$d from $a in c2") }
@@ -76,8 +69,6 @@ class SafeUdpClientTest {
         }
 
         runBlocking { delay(500) }
-
-        us.stop()
     }
 
     @Test
@@ -93,11 +84,11 @@ class SafeUdpClientTest {
     @Test
     fun unav() {
         val s = DatagramSocket(InetSocketAddress("0.0.0.0", 0))
-        s.connect(InetSocketAddress("192.168.0.141", 34565))
+        s.connect(InetSocketAddress("127.0.0.1", 34565))
 
         assert(s.isBound)
 
-        s.send(DatagramPacket(byteArrayOf(1, 2, 3), 3, InetSocketAddress("192.168.0.141", 34565)))
+        s.send(DatagramPacket(byteArrayOf(1, 2, 3), 3, InetSocketAddress("127.0.0.1", 34565)))
 
         runBlocking { delay(100) }
 
