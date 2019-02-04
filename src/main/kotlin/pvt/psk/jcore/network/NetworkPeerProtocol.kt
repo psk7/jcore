@@ -62,11 +62,8 @@ class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IC
         }
     }
 
-    override fun createPollCommand(): PollCommand {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
+    override fun createPollCommand(): PollCommand = NetworkPollCommand()
 
     override fun ProcessHostInfoCommand(Command: HostInfoCommand) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 }

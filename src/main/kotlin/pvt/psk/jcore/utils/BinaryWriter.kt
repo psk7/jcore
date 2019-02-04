@@ -33,16 +33,17 @@ class BinaryWriter {
         string.forEach { write(it.toByte()) }
     }
 
-    fun write(v: Int) = write(ByteBuffer.allocate(4).putInt(v).array())
+    fun write(v: Int) = write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array())
 
     fun write(v: ByteArray) = baseStream.write(v)
 
-    fun write(v: UUID) {
-        write(v.mostSignificantBits)
-        write(v.leastSignificantBits)
-    }
+    fun write(v: UUID) = write(v.toArray())
 
     private fun write(v: Long) = write(ByteBuffer.allocate(8).putLong(v).array())
+
+    fun write(v: Short) = write(ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort(v).array())
+
+    fun write(v: Boolean) = write(if (v) 1.toByte() else 0)
 
     fun toArray(): ByteArray = (baseStream as ByteArrayOutputStream).toByteArray()
 }

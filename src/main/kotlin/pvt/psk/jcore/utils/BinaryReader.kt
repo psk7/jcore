@@ -30,12 +30,7 @@ class BinaryReader {
         return acc
     }
 
-    fun readUUID(): UUID {
-        val bb = ByteBuffer.wrap(readBytes(16))
-        val high = bb.getLong()
-        val low = bb.getLong()
-        return UUID(high, low)
-    }
+    fun readUUID(): UUID = readBytes(16).toUUID()
 
     fun ReadString(): String = String(CharArray(read7BitEncodedInt()) { readChar() })
 

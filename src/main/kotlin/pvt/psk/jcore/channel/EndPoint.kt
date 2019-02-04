@@ -1,4 +1,6 @@
 package pvt.psk.jcore.channel
 
-class EndPoint {
+import pvt.psk.jcore.host.*
+
+open class EndPoint(val dataChannel: IChannel, val sender: SenderSocket, val targetHost: HostID) {
 }

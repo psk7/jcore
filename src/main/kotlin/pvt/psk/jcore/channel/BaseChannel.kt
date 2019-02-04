@@ -1,4 +1,7 @@
 package pvt.psk.jcore.channel
 
-open class BaseChannel {
+abstract class BaseChannel {
+
+    lateinit var localEndPoint: EndPoint
+        protected set
 }
