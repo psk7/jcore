@@ -4,7 +4,7 @@ import kotlinx.coroutines.*
 import pvt.psk.jcore.host.*
 import java.util.*
 
-class HostInfoCommand(val SequenceID: Int, FromHost: HostID, val endPoints: Array<EndPointInfo>, ToHost: HostID, vararg val payload: Array<Any>) :
+open class HostInfoCommand(val SequenceID: Int, FromHost: HostID, val endPoints: Array<EndPointInfo>, ToHost: HostID, vararg val payload: Array<Any>) :
     PeerCommand(CommandID.HostInfo, FromHost, ToHost) {
 
     val _ct = CompletableDeferred<Unit>()

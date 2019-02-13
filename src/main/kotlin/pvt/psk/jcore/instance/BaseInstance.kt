@@ -32,7 +32,7 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
     }
 
     open fun init() {
-        Log?.writeLog(LogImportance.Info, logCat, "Создан экземпляр {$HostID}");
+        Log?.writeLog(LogImportance.Info, logCat, "Создан экземпляр $HostID");
     }
 
     protected abstract fun createPeerProtocol(Control: IChannel, Domain: String): PeerProtocol
