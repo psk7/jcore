@@ -8,7 +8,7 @@ import java.util.concurrent.*
 import pvt.psk.jcore.utils.*
 import java.util.concurrent.atomic.*
 
-abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val controlChannel: IChannel, val logger: Logger?) : IPeerCommandFactory {
+abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlChannel: IChannel, val logger: Logger?) : IPeerCommandFactory {
     val logCat: String = "Peer"
 
     data class HostData(var lastSequenceID: Int)
@@ -16,18 +16,20 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
     val hosts = ConcurrentHashMap<HostID, HostData>()
     val curseqid = AtomicInteger(1)
 
+    protected val Control : IChannelEndPoint
+
     init {
-        controlChannel.filterLocal().received += { (c, d) -> controlReceived(c, d) }
+        Control = controlChannel.filterLocal().getChannel(::controlReceived)
     }
 
     // Control.FilterLocal().OnDataReceived += ControlReceived;
 
-    fun discovery() = controlChannel.sendMessage(DiscoveryCommand(selfHostID, HostID.Network))
-    fun leave() = controlChannel.sendMessage(LeaveCommand(selfHostID, HostID.Network))
+    fun discovery() = Control.sendMessage(DiscoveryCommand(selfHostID, HostID.Network))
+    fun leave() = Control.sendMessage(LeaveCommand(selfHostID, HostID.Network))
 
     fun getHosts() = hosts.keys
 
-    private fun controlReceived(channel: IChannel, packet: Message) {
+    private fun controlReceived(channel: IChannelEndPoint, packet: Message) {
         val fh = packet.FromHost
         var th = packet.ToHost
 
@@ -66,7 +68,7 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
         if (isHostKnown)
             return
 
-        controlChannel.sendMessage(DiscoveryCommand(selfHostID, tgt))
+        Control.sendMessage(DiscoveryCommand(selfHostID, tgt))
     }
 
     private fun onHostInfo(HostInfo: HostInfoCommand, FromHost: HostID) {
@@ -87,12 +89,12 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
         }
 
         if (!isHostKnown) {
-            logger?.writeLog(LogImportance.Info, logCat, "В домене обнаружен хост {$FromHost}")
+            logger?.writeLog(LogImportance.Info, logCat, "В домене обнаружен хост $FromHost")
 
             onNewHost(FromHost)
         }
 
-        ProcessHostInfoCommand(HostInfo)
+        processHostInfoCommand(HostInfo)
 
         onHostInfo(HostInfo)
     }
@@ -117,12 +119,12 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
 
         var np = createPollCommand()
 
-        controlChannel.sendMessage(np)
+        Control.sendMessage(np)
 
-        controlChannel.sendHostInfo(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, ToHost))
+        Control.sendHostInfo(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, ToHost))
     }
 
-    protected fun adjustTargetHost(From: HostID, To: HostID): Pair<Boolean, HostID> {
+    fun adjustTargetHost(From: HostID, To: HostID): Pair<Boolean, HostID> {
 
         if (From == selfHostID) // Свои пакеты отбрасываются
             return Pair(false, To)
@@ -140,11 +142,11 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, val cont
 
     protected abstract fun createPollCommand(): PollCommand
 
-    private fun onPing(Ping: PingCommand) = controlChannel.sendMessage(PingReplyCommand(HostID.Local, Ping.FromHost, Ping.Token))
+    private fun onPing(Ping: PingCommand) = Control.sendMessage(PingReplyCommand(HostID.Local, Ping.FromHost, Ping.Token))
 
     private fun onPingReply(PingReply: PingReplyCommand) = received(PingReply.Token, true)
 
-    protected abstract fun ProcessHostInfoCommand(Command: HostInfoCommand)
+    protected abstract fun processHostInfoCommand(Command: HostInfoCommand)
 }
 
 

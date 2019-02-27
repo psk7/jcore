@@ -1,5 +1,6 @@
 package pvt.psk.jcore.network
 
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.utils.*
@@ -12,9 +13,13 @@ fun HostInfoCommand.serialize(writer: BinaryWriter) {
     for (e in endPoints)
         e.run {
             writer.write(channelName)
-            writer.write(port())
+            writer.write(port)
             writer.write(readOnly)
         }
+}
+
+fun HostInfoCommand.getSourceIPAddress() : Deferred<InetAddress>{
+    return CompletableDeferred<InetAddress>()
 }
 
 fun HostInfoCommand.setSourceIpAddress(Address: InetAddress) {

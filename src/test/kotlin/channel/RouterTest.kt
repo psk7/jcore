@@ -6,31 +6,22 @@ import pvt.psk.jcore.host.*
 import java.util.*
 import org.junit.jupiter.api.Assertions.*
 
-class RouterTest
-{
+class RouterTest {
     class TestMessage(val Value: String, ToHost: HostID) : Message(HostID.Local, ToHost)
 
-    fun compare(List: MutableList<TestMessage>, vararg inds: Int)
-    {
+    fun compare(List: MutableList<TestMessage>, vararg inds: Int) {
         assert(List.count() == inds.count())
 
         inds.forEachIndexed { index, i -> assertEquals(List[index].Value, "Test" + i.toString()) }
     }
 
     @Test
-    fun Channels()
-    {
+    fun Channels() {
         val h1 = HostID(UUID.randomUUID(), "Host1")
         val h2 = HostID(UUID.randomUUID(), "Host2")
         val h3 = HostID(UUID.randomUUID(), "Host3")
 
         val r = Router()
-
-        val ch1 = r.getChannel(true, h1)
-        val ch2 = r.getChannel(acceptHost = h2)
-        val ch3 = r.getChannel(acceptHost = h3)
-        val ch4 = r.getChannel(true)
-        val ch5 = r.getChannel()
 
         val l1 = mutableListOf<TestMessage>()
         val l2 = mutableListOf<TestMessage>()
@@ -38,11 +29,13 @@ class RouterTest
         val l4 = mutableListOf<TestMessage>()
         val l5 = mutableListOf<TestMessage>()
 
-        ch1.received += { (_, p) -> l1.add(p as TestMessage) }
-        ch2.received += { (_, p) -> l2.add(p as TestMessage) }
-        ch3.received += { (_, p) -> l3.add(p as TestMessage) }
-        ch4.received += { (_, p) -> l4.add(p as TestMessage) }
-        ch5.received += { (_, p) -> l5.add(p as TestMessage) }
+        fun MutableList<TestMessage>.add(): DataReceived = { _, m -> add(m as TestMessage) }
+
+        val ch1 = r.acceptHost(h1).getChannel(l1.add())
+        val ch2 = r.acceptHost(h2).getChannel(l2.add())
+        val ch3 = r.acceptHost(h3).getChannel(l3.add())
+        val ch4 = r.getChannel(l4.add())
+        val ch5 = r.getChannel(l5.add())
 
         ch1.sendMessage(TestMessage("Test1", HostID.All))
         ch1.sendMessage(TestMessage("Test2", h1))
@@ -53,10 +46,10 @@ class RouterTest
         ch4.sendMessage(TestMessage("Test7", HostID.All))
         ch3.sendMessage(TestMessage("Test8", h1))
 
-        compare(l1, 1, 2, 6, 7, 8)
+        compare(l1, 6, 7, 8)
         compare(l2, 1, 3, 6, 7)
         compare(l3, 1, 5, 6, 7)
-        compare(l4, 1, 2, 3, 4, 5, 6, 7, 8)
+        compare(l4, 1, 2, 3, 4, 5, 6, 8)
         compare(l5, 1, 2, 3, 4, 5, 7, 8)
     }
 

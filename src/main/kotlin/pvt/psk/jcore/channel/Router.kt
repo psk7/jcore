@@ -1,13 +1,12 @@
 package pvt.psk.jcore.channel
 
 import pvt.psk.jcore.host.*
-import pvt.psk.jcore.utils.*
 import java.util.concurrent.*
 import java.util.concurrent.atomic.*
 
 private val ids = AtomicInteger(1)
 
-class Router {
+class Router : IChannel {
 
     val lst = ConcurrentHashMap<Int, LocalChannel>()
 
@@ -16,13 +15,8 @@ class Router {
     //region LocalChannel
     class LocalChannel(val Router: Router,
                        val ID: Int,
-                       val enableFeedback: Boolean,
-                       val acceptHost: HostID?,
-                       val description: String?) : IChannelControl {
-
-        private val r = Event<DataReceived>()
-
-        override val received: Event<DataReceived> = r
+                       val received: DataReceived?,
+                       val description: String?) : IChannelEndPoint {
 
         private var _isClosed: Boolean = false
 
@@ -30,38 +24,39 @@ class Router {
             if (_isClosed)
                 return
 
-            val b = MessageBag(ID, Data)
-
-            Router.onReceive(b, enableFeedback)
+            Router.onReceive(MessageBag(ID, Data))
         }
 
         fun invoke(Packet: Message) {
-            received(DataReceived(this, Packet))
+            if (_isClosed)
+                Router.removeChannel(ID)
+            else
+                received?.invoke(this, Packet)
         }
 
         override fun close() {
-            TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+            _isClosed = true
         }
     }
     //endregion
 
-    private fun onReceive(Packet: MessageBag, enableFeedback: Boolean) {
+    private fun onReceive(Packet: MessageBag) {
 
         val pid = Packet.instanceID
+        val pm = Packet.Message
 
-        val l = lst.filter { it.key != pid || enableFeedback }.values
-            .filter { Packet.Message.ToHost == HostID.All || it.acceptHost == null || it.acceptHost == Packet.Message.ToHost }
-
-        l.forEach { it.invoke(Packet.Message) }
+        lst.filter { it.key != pid }.values.forEach { it.invoke(pm) }
     }
 
-    fun getChannel(enableFeedback: Boolean = false,
-                   acceptHost: HostID? = null,
-                   description: String? = null): IChannelControl {
+    private fun removeChannel(ID: Int) {
+        lst.remove(ID)
+    }
+
+    override fun getChannel(received: DataReceived?, description: String?): IChannelEndPoint {
 
         val id = ids.getAndIncrement()
 
-        val lc = LocalChannel(this, id, enableFeedback, acceptHost, description)
+        val lc = LocalChannel(this, id, received, description)
 
         lst[id] = lc
 

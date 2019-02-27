@@ -6,7 +6,7 @@ import pvt.psk.jcore.utils.*
 import java.net.*
 import java.nio.channels.*
 
-class NetworkSenderSocket(cancellationToken: CancellationToken, logger: Logger) : SenderSocket(cancellationToken, logger) {
+class NetworkSenderSocket(cancellationToken: CancellationToken, logger: Logger?) : SenderSocket(cancellationToken, logger) {
     enum class PacketID(val id: Int) {
 
         Datagram(1),

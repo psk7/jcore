@@ -13,7 +13,7 @@ open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: 
     override fun createPeerProtocol(Control: IChannel, Domain: String): PeerProtocol = NetworkPeerProtocol(HostID, Domain, Control, Log)
 
     override fun createPeerCommandSocket(): PeerCommandSocket {
-        val cs = NetworkCommandSocket(ControlBus.getChannel(), AdmPort, Log, PeerProto, CancellationToken)
+        val cs = NetworkCommandSocket(ControlBus, AdmPort, Log, PeerProto, CancellationToken)
         cs.IgnoreFromHost = HostID
 
         //cs.BeginReceive()

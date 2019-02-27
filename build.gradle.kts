@@ -32,7 +32,7 @@ dependencies {
     //testRuntime("org.junit.platform:junit-platform-console:1.2.0")
 
     implementation(kotlin("stdlib-jdk8"))
-    implementation("io.ktor:ktor-network:1.1.2")
+    implementation("io.ktor:ktor-network:1.1.3")
 }
 
 tasks.withType<KotlinCompile> {

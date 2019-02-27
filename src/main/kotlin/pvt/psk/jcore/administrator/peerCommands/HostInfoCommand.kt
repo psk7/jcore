@@ -12,7 +12,7 @@ open class HostInfoCommand(val SequenceID: Int, FromHost: HostID, val endPoints:
 
     fun addTask(job: Job) = synchronized(_tl) { _tl.add(job) }
 
-    fun complete(): Job = GlobalScope.async {
+    fun complete(): Deferred<Unit> = GlobalScope.async {
         _ct.join()
 
         for (j in synchronized(_tl) { _tl.toTypedArray() })

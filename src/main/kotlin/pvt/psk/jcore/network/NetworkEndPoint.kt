@@ -9,8 +9,16 @@ class NetworkEndPoint(dataChannel: IChannel,
                       targetHost: HostID,
                       val controlBus: IChannel,
                       val readOnly: Boolean = false,
-                      val sorter: IGetPreferredIPEndPoint) : EndPoint(dataChannel, sender, targetHost) {
+                      val sorter: IGetPreferredIPEndPoint? = null) : EndPoint(dataChannel, sender, targetHost) {
 
     lateinit var target: InetSocketAddress
         private set
+
+    fun updateIPAddresses(NewTargetEndPoint: InetSocketAddress) {
+
+    }
+
+    var isReadOnly: Boolean
+        get() = true
+        set(value) = Unit
 }

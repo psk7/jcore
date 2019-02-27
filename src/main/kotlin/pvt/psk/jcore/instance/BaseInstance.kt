@@ -24,7 +24,7 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
 
         ControlBus = Router()
 
-        PeerProto = createPeerProtocol(ControlBus.getChannel(), DomainName)
+        PeerProto = createPeerProtocol(ControlBus, DomainName)
 
         ComSocket = createPeerCommandSocket()
 

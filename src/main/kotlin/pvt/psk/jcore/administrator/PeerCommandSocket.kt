@@ -11,13 +11,15 @@ abstract class PeerCommandSocket protected constructor(val Bus: IChannel,
                                                        val CommandFactory: IPeerCommandFactory,
                                                        CancellationToken: CancellationToken) {
 
+    private val _bus: IChannelEndPoint
+
     init {
-        Bus.received += { (_, p) -> onBusCmd(p) }
+        _bus = Bus.getChannel(::onBusCmd)
     }
 
     protected val LogCat: String = "PeerCmd"
 
-    private fun onBusCmd(data: Message) {
+    private fun onBusCmd(channel: IChannelEndPoint, data: Message) {
         if (data !is PeerCommand || !data.ToHost.isNetwork)
             return
 
@@ -34,11 +36,10 @@ abstract class PeerCommandSocket protected constructor(val Bus: IChannel,
 
     protected abstract fun send(datagram: ByteArray, target: HostID)
 
-    protected fun onReceive(Message :Message)
-    {
+    protected fun onReceive(Message: Message) {
         Log?.writeLog(LogImportance.Trace, LogCat, "Принята команда $Message для ${Message.ToHost}")
 
-        Bus.sendMessage(Message);
+        _bus.sendMessage(Message);
     }
 
     abstract fun BeginReceive()

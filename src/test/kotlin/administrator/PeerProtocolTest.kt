@@ -29,7 +29,7 @@ private class TestPeerProtocol(selfHostID: HostID, domain: String, controlChanne
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    override fun ProcessHostInfoCommand(Command: HostInfoCommand) {
+    override fun processHostInfoCommand(Command: HostInfoCommand) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
@@ -56,7 +56,7 @@ class PeerProtocolTest {
 
         val hid = HostID(UUID.randomUUID(), "Host")
 
-        val pp = TestPeerProtocol(hid, "TestDomain", r.getChannel(), l)
+        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
 
         assertEquals(hid, pp.selfHostID)
     }
@@ -68,13 +68,11 @@ class PeerProtocolTest {
 
         val hid = HostID(UUID.randomUUID(), "Host")
 
-        val pp = TestPeerProtocol(hid, "TestDomain", r.getChannel(), l)
-
-        val dc = r.getChannel()
+        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
 
         val lst = mutableListOf<Message>()
 
-        dc.received += { (_, p) -> lst.add(p) }
+        val dc = r.getChannel({ _, p -> lst.add(p) })
 
         pp.discovery()
 
@@ -94,13 +92,11 @@ class PeerProtocolTest {
 
         val hid = HostID(UUID.randomUUID(), "Host")
 
-        val pp = TestPeerProtocol(hid, "TestDomain", r.getChannel(), l)
-
-        val dc = r.getChannel()
+        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
 
         val lst = mutableListOf<Message>()
 
-        dc.received += { (_, p) -> lst.add(p) }
+        val dc = r.getChannel({ _, p -> lst.add(p) })
 
         pp.leave()
 
@@ -120,15 +116,13 @@ class PeerProtocolTest {
 
         val hid = HostID(UUID.randomUUID(), "Host")
         val fromhost = HostID(UUID.randomUUID(), "FromHost")
-        var fromip = InetSocketAddress(Inet6Address.getLoopbackAddress(), 1111)
+        val fromip = InetSocketAddress(Inet6Address.getLoopbackAddress(), 1111)
 
-        var pp = TestPeerProtocol(hid, "TestDomain", r.getChannel(), l)
-
-        val dc = r.getChannel()
+        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
 
         val lst = mutableListOf<Message>()
 
-        dc.received += { (_, p) -> lst.add(p) }
+        val dc = r.getChannel({ _, p -> lst.add(p) })
 
         dc.sendMessage(DiscoveryCommand(fromhost, HostID.Local))
 
@@ -150,4 +144,45 @@ class PeerProtocolTest {
         assert(lst[5] is DiscoveryCommand)
     }
 
+    @Test
+    fun adjustTargetHost() {
+        var r = Router()
+        var remote = HostID(UUID.randomUUID(), "Remote")
+        var self = HostID(UUID.randomUUID(), "Self")
+
+        var pp = TestPeerProtocol(self, "TestDomain", r, null)
+
+        val D = { f: HostID, t: HostID ->
+            val r = pp.adjustTargetHost(f, t)
+
+            if (r.first)
+                DiscoveryCommand(f, r.second)
+            else
+                null
+        }
+
+        // remote отсылал пакет с отправителя Local -> ALL. Формируется remote
+        var c = D(HostID.Local, HostID.All)
+        assertEquals(HostID.Local, c!!.FromHost)
+        assertEquals(HostID.Local, c.ToHost)
+
+        // remote отсылал пакет со своего HostID -> ALL. Формируется remote
+        c = D(remote, HostID.All)
+        assertEquals(remote, c!!.FromHost)
+        assertEquals(HostID.Local, c.ToHost)
+
+        assertNull(D(HostID.Local, HostID.Network))
+        assertNull(D(remote, HostID.Network))
+
+        // remote отсылал пакет с отправителя Local -> self. Формируется remote
+        c = D(HostID.Local, self)
+        assertEquals(HostID.Local, c!!.FromHost)
+        assertEquals(HostID.Local, c.ToHost)
+
+        // remote отсылал пакет со своего HostID -> self. Формируется remote
+        // приемник Local
+        c = D(remote, self)
+        assertEquals(remote, c!!.FromHost)
+        assertEquals(HostID.Local, c.ToHost)
+    }
 }

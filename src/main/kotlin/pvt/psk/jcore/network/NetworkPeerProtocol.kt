@@ -64,6 +64,6 @@ class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IC
 
     override fun createPollCommand(): PollCommand = NetworkPollCommand()
 
-    override fun ProcessHostInfoCommand(Command: HostInfoCommand) {
+    override fun processHostInfoCommand(Command: HostInfoCommand) {
     }
 }

@@ -3,17 +3,25 @@ package pvt.psk.jcore.utils
 class CancellationToken {
 
     companion object {
-        private val _none = CancellationToken()
+        private val none = CancellationToken()
 
         val None: CancellationToken
-            get() = _none
+            get() = none
     }
 
-    fun register(safeClose: () -> Unit) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    fun register(safeClose: () -> Unit) = source!!.register(safeClose)
+
+    internal constructor(source: CancellationTokenSource?) {
+        this.source = source
     }
+
+    constructor() {
+        this.source = null
+    }
+
+    private val source: CancellationTokenSource?
 
     val isCancellationRequested: Boolean
-        get() = false
+        get() = source?.isCancellationRequested ?: false
 
 }

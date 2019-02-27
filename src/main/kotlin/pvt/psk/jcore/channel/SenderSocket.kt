@@ -3,7 +3,7 @@ package pvt.psk.jcore.channel
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 
-abstract class SenderSocket(val cancellationToken: CancellationToken, val logger: Logger) {
+abstract class SenderSocket(val cancellationToken: CancellationToken, val logger: Logger?) : ISender {
 
     val logCat: String = "SenderSocket"
 
@@ -11,7 +11,7 @@ abstract class SenderSocket(val cancellationToken: CancellationToken, val logger
         cancellationToken.register(::safeClose)
     }
 
-    fun send(Packet: DataPacket, Target: EndPoint) {
+    override fun send(Packet: DataPacket, Target: EndPoint) {
 
         if (!Packet.ToHost.isNetwork)
             return
