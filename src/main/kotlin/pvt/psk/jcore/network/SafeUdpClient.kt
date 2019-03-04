@@ -6,9 +6,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.io.core.*
 import pvt.psk.jcore.utils.*
+import java.lang.Exception
 import java.net.*
-import java.nio.*
-import java.nio.channels.*
 
 class SafeUdpClient(val BindEndPoint: InetSocketAddress,
                     val CancellationToken: CancellationToken,
@@ -46,13 +45,25 @@ class SafeUdpClient(val BindEndPoint: InetSocketAddress,
         operator fun minusAssign(m: (TS, TA) -> Unit)
     }
 
+    val selector = ActorSelectorManager(Dispatchers.IO)
     private val _udp: BoundDatagramSocket
 
     val received = Delegate<ByteArray, InetSocketAddress>()
 
     init {
 
-        _udp = aSocket(ActorSelectorManager(Dispatchers.IO)).udp().bind(BindEndPoint) { reuseAddress = IsMulticast }
+        fun UDPSocketBuilder.safeBind(): BoundDatagramSocket {
+            while (true) {
+                try {
+                    return bind(BindEndPoint) { reuseAddress = IsMulticast }
+                } catch (e: Exception) {
+                    runBlocking { delay(100) }
+                }
+            }
+
+        }
+
+        _udp = aSocket(selector).udp().safeBind()
 
         beginReceive()
     }

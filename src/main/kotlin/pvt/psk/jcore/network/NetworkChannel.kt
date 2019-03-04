@@ -20,10 +20,10 @@ class NetworkChannel(Name: String,
 
     val _nss: NetworkSenderSocket
     val _ipl = IPEndPointsList()
+    val udp = SafeUdpClient(InetSocketAddress(InetAddress.getByName("::"), 0), CancellationToken)
 
     init {
-
-        _nss = NetworkSenderSocket(CancellationToken, Logger)
+        _nss = NetworkSenderSocket(udp, CancellationToken, Logger)
     }
 
     val networkLocalEndPoint: NetworkEndPoint
@@ -53,7 +53,7 @@ class NetworkChannel(Name: String,
 
         val hid = Command.FromHost
 
-        val ep = NetworkEndPoint(Data, _nss, hid, ControlBus, true)
+        val ep = NetworkEndPoint(Data, _nss, hid, ControlBus, true, canReceiveStream = EndPointInfo.canReceiveStream)
         ep.updateIPAddresses(ipe)
 
         Logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $ep в канале $Name")

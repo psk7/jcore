@@ -3,8 +3,9 @@ import org.jetbrains.kotlin.gradle.tasks.*
 plugins {
     base
     kotlin("jvm") version "1.3.21"
-    application
-    distribution
+    //application
+    //distribution
+    maven
 }
 
 group = "pvt.psk"
@@ -15,7 +16,15 @@ repositories {
     jcenter()
 }
 
-application.mainClassName = "pvt.psk"
+tasks.named<Upload>("uploadArchives") {
+    repositories.withGroovyBuilder {
+        "mavenDeployer" {
+            "repository"("url" to "file://localhost/etc/tmp/myRepo/")
+        }
+    }
+}
+
+//application.mainClassName = "pvt.psk"
 
 configurations.create("contestCompile") {
     extendsFrom(configurations.implementation.get())

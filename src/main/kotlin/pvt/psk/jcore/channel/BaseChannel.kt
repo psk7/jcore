@@ -9,18 +9,22 @@ import pvt.psk.jcore.host.*
 import java.util.concurrent.*
 
 abstract class BaseChannel(val Name: String,
-                           val Peer: PeerProtocol,
-                           val ControlBus: IChannel,
-                           val Data: Router,
-                           val Logger: Logger?,
-                           val CancellationToken: CancellationToken) {
+                           protected val Peer: PeerProtocol,
+                           protected val ControlBus: IChannel,
+                           protected val Data: Router,
+                           protected val Logger: Logger?,
+                           cancellationToken: CancellationToken) {
 
     val logCat = "BaseChannel"
 
-    private val svcEp: IChannelEndPoint = Data.getChannel(description = "ServiceEndPoint of $Name")
-    private var cbEp: IChannelEndPoint? = null
+    private val svcEp: IChannelEndPoint
+    lateinit private var cbEp: IChannelEndPoint
 
     private val _l = ConcurrentHashMap<HostID, EndPoint>()
+
+    private val cts: CancellationTokenSource
+
+    protected val cancToken: CancellationToken
 
     lateinit var localEndPoint: EndPoint
         protected set
@@ -28,11 +32,19 @@ abstract class BaseChannel(val Name: String,
     val isClosed: Boolean
         get() = true
 
+    init {
+
+        svcEp = Data.getChannel(description = "ServiceEndPoint of $Name")
+
+        cts = cancellationToken.getSafeToken()
+        cancToken = cts.token
+    }
+
     protected fun initComplete() {
         cbEp = ControlBus.filterLocal(::ControlReceived)
     }
 
-    fun getChannel(received: DataReceived?, description: String): IChannelEndPoint = Data.getChannel(received, description)
+    fun getChannel(received: DataReceived? = null, description: String? = null): IChannelEndPoint = Data.getChannel(received, description)
 
     protected abstract fun processPollCommand(command: PollCommand)
 
@@ -57,7 +69,7 @@ abstract class BaseChannel(val Name: String,
                     m.addTask(j)
             }
 
-            is PollCommand     -> processPollCommand(m)
+            is PollCommand -> processPollCommand(m)
         }
     }
 

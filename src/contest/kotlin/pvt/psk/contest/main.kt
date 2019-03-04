@@ -1,6 +1,7 @@
 package pvt.psk.contest
 
 import kotlinx.coroutines.*
+import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.logger.*
 import java.io.Console
 
@@ -37,5 +38,37 @@ fun main(args: Array<String>) {
     val inst = Instance(createId())
     inst.init()
 
-    runBlocking { delay(1000000) }
+    var chan : IChannelEndPoint? = null
+
+    l@ while (true) {
+        val k = readLine()!!.toLowerCase().trim()
+
+        if (k == "q")
+            break
+
+        when (k) {
+            "h", "p", "?" -> {
+                printHelp()
+                println()
+            }
+
+            "1"           -> {
+                println("Список известных хостов:")
+
+                inst.getHosts().forEach { println(it) }
+            }
+
+            "2"           -> {
+                if (chan == null)
+                {
+                    println("Канал уже подключен")
+                    break@l
+                }
+
+                println("Подключение к каналу Channel2")
+
+                chan = inst.joinChannel("Channel").getChannel()
+            }
+        }
+    }
 }

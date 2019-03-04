@@ -72,4 +72,15 @@ class CancellationTokenTest {
 
         assertFalse(ccts.isCancellationRequested)
     }
+
+    @Test
+    fun regOnNone() {
+
+        // Попытка регистрации отмены на CancellationToken.None должна игнорироваться
+        val ct = CancellationToken.None
+
+        var r = ct.register {
+            throw Exception()
+        }
+    }
 }

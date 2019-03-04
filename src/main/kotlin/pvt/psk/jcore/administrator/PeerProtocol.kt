@@ -22,12 +22,10 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
         Control = controlChannel.filterLocal().getChannel(::controlReceived)
     }
 
-    // Control.FilterLocal().OnDataReceived += ControlReceived;
-
     fun discovery() = Control.sendMessage(DiscoveryCommand(selfHostID, HostID.Network))
     fun leave() = Control.sendMessage(LeaveCommand(selfHostID, HostID.Network))
 
-    fun getHosts() = hosts.keys
+    fun getHosts() : Array<HostID> = hosts.keys.toTypedArray()
 
     private fun controlReceived(channel: IChannelEndPoint, packet: Message) {
         val fh = packet.FromHost
@@ -144,7 +142,7 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
 
     private fun onPing(Ping: PingCommand) = Control.sendMessage(PingReplyCommand(HostID.Local, Ping.FromHost, Ping.Token))
 
-    private fun onPingReply(PingReply: PingReplyCommand) = received(PingReply.Token, true)
+    private fun onPingReply(PingReply: PingReplyCommand) = PingReply.Token.received(true)
 
     protected abstract fun processHostInfoCommand(Command: HostInfoCommand)
 }

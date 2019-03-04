@@ -45,5 +45,7 @@ class BinaryWriter {
 
     fun write(v: Boolean) = write(if (v) 1.toByte() else 0)
 
+    fun write(tk: AckToken) = tk.toStream(baseStream)
+
     fun toArray(): ByteArray = (baseStream as ByteArrayOutputStream).toByteArray()
 }

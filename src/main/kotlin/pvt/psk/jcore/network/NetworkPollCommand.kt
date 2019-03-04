@@ -10,7 +10,7 @@ class NetworkPollCommand : PollCommand(HostID.Local, HostID.Local) {
         /*var chans = Channels.Select(kp => NetworkEndPointInfo.Create(kp.Key, ((NetworkChannel)kp.Value).LocalEndPoint.Target.Port, false,
         FromHost)).ToArray();*/
 
-        val chans = _chans.map { create(it.key, (it.value as NetworkChannel).networkLocalEndPoint.target.port, false, FromHost) }.toTypedArray()
+        val chans = _chans.map { create(it.key, (it.value as NetworkChannel).networkLocalEndPoint.target.port, false, FromHost, true) }.toTypedArray()
 
         return HostInfoCommand(SeqID, FromHost, chans, ToHost)
     }

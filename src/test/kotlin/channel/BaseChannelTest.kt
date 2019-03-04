@@ -1,3 +1,5 @@
+@file:Suppress("UNUSED_VARIABLE")
+
 package channel
 
 import kotlinx.coroutines.*
@@ -24,7 +26,7 @@ class BaseChannelTest {
 
     private class PC(val _fromHost: HostID, ToHost: HostID) : PollCommand(_fromHost, ToHost) {
 
-        override fun createHostInfoCommand(SeqID: Int, From: HostID, To: HostID): HostInfoCommand {
+        override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
             return HostInfoCommand(2, _fromHost, arrayOf(), HostID.Local)
         }
     }
@@ -53,13 +55,13 @@ class BaseChannelTest {
             initComplete()
         }
 
-        override fun processPollCommand(Cmd: PollCommand) {}
+        override fun processPollCommand(command: PollCommand) {}
 
-        override fun onHostRemove(Host: EndPoint) {
+        override fun onHostRemove(host: EndPoint) {
             throw Exception()
         }
 
-        override fun onHostUpdate(Command: HostInfoCommand, EndPointInfo: EndPointInfo, EndPoint: EndPoint) {
+        override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
             throw Exception()
         }
 

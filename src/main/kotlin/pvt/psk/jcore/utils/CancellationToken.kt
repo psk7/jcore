@@ -9,7 +9,10 @@ class CancellationToken {
             get() = none
     }
 
-    fun register(safeClose: () -> Unit) = source!!.register(safeClose)
+    fun register(safeClose: () -> Unit): CancellationTokenRegistration = source?.register(safeClose)
+            ?: CancellationTokenRegistration(CancellationTokenSource()) {}.also {
+                it.close()
+            }
 
     internal constructor(source: CancellationTokenSource?) {
         this.source = source
@@ -24,4 +27,17 @@ class CancellationToken {
     val isCancellationRequested: Boolean
         get() = source?.isCancellationRequested ?: false
 
+}
+
+fun CancellationToken.getSafeToken(): CancellationTokenSource {
+    val cts = CancellationTokenSource()
+
+    register {
+        try {
+            cts.cancel()
+        } catch (e: Exception) {
+        }
+    }
+
+    return cts
 }
