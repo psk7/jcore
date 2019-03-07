@@ -1,11 +1,11 @@
 package pvt.psk.jcore.channel
 
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
+import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
-import kotlinx.coroutines.*
-import pvt.psk.jcore.host.*
 import java.util.concurrent.*
 
 abstract class BaseChannel(val Name: String,
@@ -30,7 +30,7 @@ abstract class BaseChannel(val Name: String,
         protected set
 
     val isClosed: Boolean
-        get() = true
+        get() = cts.isCancellationRequested
 
     init {
 
@@ -41,10 +41,11 @@ abstract class BaseChannel(val Name: String,
     }
 
     protected fun initComplete() {
-        cbEp = ControlBus.filterLocal(::ControlReceived)
+        cbEp = ControlBus.filterLocal(::controlReceived)
     }
 
-    fun getChannel(received: DataReceived? = null, description: String? = null): IChannelEndPoint = Data.getChannel(received, description)
+    fun getChannel(received: DataReceived? = null, description: String? = null): IChannelEndPoint = Data.getChannel(
+            received, description)
 
     protected abstract fun processPollCommand(command: PollCommand)
 
@@ -53,39 +54,38 @@ abstract class BaseChannel(val Name: String,
 
         Logger?.writeLog(LogImportance.Info, logCat, "Канал $Name закрывается")
 
-        cbEp?.close()
+        cbEp.close()
     }
 
     protected abstract fun onHostRemove(host: EndPoint)
-    protected abstract fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint)
-    protected abstract fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): Deferred<EndPoint>
+    protected abstract suspend fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo,
+                                                endPoint: EndPoint)
 
-    private fun ControlReceived(c: IChannelEndPoint, m: Message) {
+    protected abstract suspend fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint
+
+    private fun controlReceived(c: IChannelEndPoint, m: Message) {
 
         when (m) {
             is HostInfoCommand -> {
-                val j = processHostInfo(m)
-                if (j != null)
-                    m.addTask(j)
+                m.addTask(GlobalScope.launch(Dispatchers.Unconfined) { processHostInfo(m) })
             }
 
             is PollCommand -> processPollCommand(m)
         }
     }
 
-    private fun processHostInfo(command: HostInfoCommand): Job? {
-        val fh = command.FromHost
-
-        val chen = command.endPoints.firstOrNull { it.channelName == Name }
-
+    private suspend fun processHostInfo(command: HostInfoCommand) {
         if (isClosed)
-            return null
+            return
+
+        val fh = command.FromHost
+        val chen = command.endPoints.firstOrNull { it.channelName == Name }
 
         val f = _l.get(fh)
 
         if (chen == null) {
             if (f == null)
-                return null
+                return
 
             f.close()
 
@@ -98,25 +98,20 @@ abstract class BaseChannel(val Name: String,
             if (_l.count() == 0)
                 close()
 
-            return null
-        }
-
-        if (f != null) {
-            onHostUpdate(command, chen, f)
         } else {
-            return GlobalScope.async {
-                _l[fh] = onHostCreate(command, chen).await()
+            if (f != null) {
+                onHostUpdate(command, chen, f)
+            } else {
+                _l[fh] = onHostCreate(command, chen)
 
-                command.complete().await()
+                command.addFinalizer {
+                    Logger?.writeLog(LogImportance.Info, logCat, "Хост ${fh.Name}<${fh.ID}> добавлен в канал ${Name}")
 
-                Logger?.writeLog(LogImportance.Info, logCat, "Хост ${fh.Name}<${fh.ID}> добавлен в канал ${Name}")
+                    Peer.sendHostInfo(fh)
 
-                Peer.sendHostInfo(fh)
-
-                svcEp.sendMessage(NewHostInChannel(fh, HostID.Local))
+                    svcEp.sendMessage(NewHostInChannel(fh, HostID.Local))
+                }
             }
         }
-
-        return null
     }
 }

@@ -12,7 +12,7 @@ fun getMethodID(Method: Method): MethodID {
 
 class MethodID(val ID: Int, val Name: String) {
 
-    constructor(Reader: BinaryReader) : this(Reader.readInt(), "")
+    constructor(Reader: BinaryReader) : this(Reader.readInt32(), "")
 
     fun Serialize(Writer: BinaryWriter) {
     }

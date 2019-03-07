@@ -1,6 +1,6 @@
 package administrator
 
-import channel.*
+import org.joda.time.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import pvt.psk.jcore.administrator.*
@@ -10,11 +10,10 @@ import pvt.psk.jcore.host.HostID
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
-import java.time.*
 import java.util.*
 
 private class TestLogger(val prefix: String) : Logger() {
-    override fun writeLog(TimeStamp: LocalDateTime, importance: LogImportance, logCat: String, message: String) {
+    override fun writeLog(TimeStamp: DateTime, importance: LogImportance, logCat: String, message: String) {
         println(message)
     }
 }

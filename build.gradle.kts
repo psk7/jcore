@@ -42,6 +42,7 @@ dependencies {
 
     implementation(kotlin("stdlib-jdk8"))
     implementation("io.ktor:ktor-network:1.1.3")
+    implementation("joda-time:joda-time:2.10.1")
 }
 
 tasks.withType<KotlinCompile> {
@@ -53,6 +54,15 @@ tasks.create<JavaExec>("runcon") {
     classpath += sourceSets["contest"].runtimeClasspath
     classpath += sourceSets["main"].runtimeClasspath
 }
+
+tasks.register("checkjvm") { 
+    doLast { 
+        if(!JavaVersion.current().isJava8())
+          throw IllegalStateException("ERROR: Java 8 required but Java ${JavaVersion.current()} found. Change your JAVA_HOME environment variable.")
+    }
+}
+
+tasks["compileKotlin"].dependsOn += "checkjvm"
 
 tasks {
     // Use the built-in JUnit support of Gradle.

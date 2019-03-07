@@ -17,7 +17,7 @@ class NetworkCommandSocket(Bus: IChannel,
                            Log: Logger?,
                            CommandFactory: IPeerCommandFactory,
                            private val CancellationToken: CancellationToken) :
-    PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken) {
+        PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken) {
 
     private val _unicastudp: SafeUdpClient
     private val _mcsocket: MulticastSocket
@@ -39,8 +39,8 @@ class NetworkCommandSocket(Bus: IChannel,
         _admpoints[HostID.All] = cep;
         _admpoints[HostID.Network] = cep;
 
-        _unicastudp.received += { data: ByteArray, from: InetSocketAddress ->
-            GlobalScope.launch(Dispatchers.Unconfined) {
+        _unicastudp.received += { data, from ->
+            GlobalScope.launch {
                 received(data, from)
             }
         }
@@ -68,7 +68,7 @@ class NetworkCommandSocket(Bus: IChannel,
                 val ba = ByteArray(l)
                 dp.data.copyInto(ba, endIndex = l)
 
-                launch(Dispatchers.Default) { received(ba, dp.socketAddress as InetSocketAddress) }
+                launch { received(ba, dp.socketAddress as InetSocketAddress) }
             }
         }
     }
@@ -84,6 +84,9 @@ class NetworkCommandSocket(Bus: IChannel,
         try {
             mtx.lock()
 
+            if (!CommandFactory.filter(cmd))
+                return
+
             if (cmd is HostInfoCommand)
                 cmd.setSourceIpAddress(from.address)
 
@@ -96,8 +99,7 @@ class NetworkCommandSocket(Bus: IChannel,
             _admpoints.getOrPut(cmd.FromHost) { CommandEndPoints().add(from) }
 
             onReceive(cmd)
-        }
-        finally {
+        } finally {
             if (cmd is HostInfoCommand)
                 cmd.release()
 
@@ -115,5 +117,14 @@ class NetworkCommandSocket(Bus: IChannel,
         Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды по адресу $send");
 
         _unicastudp.send(datagram, send)
+    }
+
+    override fun dumpHostInfoCommand(cmd: HostInfoCommand) {
+        if (Log == null)
+            return
+
+//        cmd.endPoints.forEach {
+//            Log.writeLog(LogImportance.Info, LogCat, "EPI: ${it.channelName} at ${it.target}:${it.port}")
+//        }
     }
 }

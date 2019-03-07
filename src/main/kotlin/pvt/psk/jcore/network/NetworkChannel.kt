@@ -1,6 +1,5 @@
 package pvt.psk.jcore.network
 
-import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
@@ -9,21 +8,23 @@ import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 
-class NetworkChannel(Name: String,
-                     Peer: PeerProtocol,
-                     ControlBus: IChannel,
-                     Data: Router,
-                     val HostID: HostID,
-                     Logger: Logger?,
-                     bindAddress: InetSocketAddress,
-                     CancellationToken: CancellationToken) : BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
+class NetworkChannel(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Data: Router, HostID: HostID,
+                     Logger: Logger?, bindAddress: InetSocketAddress, CancellationToken: CancellationToken)
+    : BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
 
     val _nss: NetworkSenderSocket
     val _ipl = IPEndPointsList()
     val udp = SafeUdpClient(InetSocketAddress(InetAddress.getByName("::"), 0), CancellationToken)
 
     init {
-        _nss = NetworkSenderSocket(udp, CancellationToken, Logger)
+        _nss = NetworkSenderSocket(udp, CancellationToken, _ipl, Logger)
+
+        val nep = NetworkEndPoint(null, _nss, HostID, ControlBus)
+        nep.updateIPAddresses(InetSocketAddress(Inet6Address.getLoopbackAddress(), udp.localEndPoint.port))
+
+        super.localEndPoint = nep
+
+        initComplete()
     }
 
     val networkLocalEndPoint: NetworkEndPoint
@@ -33,21 +34,18 @@ class NetworkChannel(Name: String,
         host.close()
     }
 
-    override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
-        GlobalScope.launch {
+    override suspend fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
+        val ha = InetSocketAddress(command.getSourceIPAddress().await(), endPointInfo.port)
 
-            var ha = InetSocketAddress(command.getSourceIPAddress().await(), endPointInfo.port)
+        _ipl.found(ha, endPoint);
 
-            _ipl.found(ha, endPoint);
-
-            if (endPoint is NetworkEndPoint) {
-                endPoint.isReadOnly = endPointInfo.readOnly;
-                endPoint.updateIPAddresses(ha);
-            }
+        if (endPoint is NetworkEndPoint) {
+            endPoint.isReadOnly = endPointInfo.readOnly;
+            endPoint.updateIPAddresses(ha);
         }
     }
 
-    override fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): Deferred<EndPoint> = GlobalScope.async {
+    override suspend fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
 
         val ipe = InetSocketAddress(Command.getSourceIPAddress().await(), EndPointInfo.port)
 
@@ -60,7 +58,7 @@ class NetworkChannel(Name: String,
 
         _ipl.found(ipe, ep)
 
-        return@async ep
+        return ep
     }
 
     override fun processPollCommand(command: PollCommand) {

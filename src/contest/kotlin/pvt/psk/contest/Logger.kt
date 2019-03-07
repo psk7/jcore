@@ -1,7 +1,8 @@
 package pvt.psk.contest
 
+import org.joda.time.*
 import pvt.psk.jcore.logger.*
-import java.time.*
+import java.time.LocalDateTime
 import java.time.format.*
 
 fun String.red() = "\u001b[31m${this}\u001b[0m"
@@ -13,7 +14,7 @@ fun String.format(timeStamp: LocalDateTime, importance: LogImportance, logCat: S
     "[${DateTimeFormatter.ofPattern("HH:mm:ss").format(timeStamp)}] [$importance]: <$logCat> $this"
 
 open class Logger : pvt.psk.jcore.logger.Logger() {
-    override fun writeLog(TimeStamp: LocalDateTime, importance: LogImportance, logCat: String, message: String) {
+    override fun writeLog(TimeStamp: DateTime, importance: LogImportance, logCat: String, message: String) {
 
         when (importance) {
             LogImportance.Trace   -> println(message.format(TimeStamp, importance, logCat).gray())

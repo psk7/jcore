@@ -48,4 +48,6 @@ class BinaryWriter {
     fun write(tk: AckToken) = tk.toStream(baseStream)
 
     fun toArray(): ByteArray = (baseStream as ByteArrayOutputStream).toByteArray()
+
+    fun write(v: Double) = write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putDouble(v).array())
 }

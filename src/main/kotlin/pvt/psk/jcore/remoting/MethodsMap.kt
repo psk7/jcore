@@ -18,7 +18,7 @@ class MethodsMap(type: Class<*>) {
         for (itm in methods) {
 
             val nit = ObjectType.methods.first { it.name == itm.name }
-            nit.trySetAccessible()
+            //nit.trySetAccessible()
 
             map[getMethodID(itm)] = nit
         }

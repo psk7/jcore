@@ -18,7 +18,7 @@ class BinaryReader {
         baseStream = Stream
     }
 
-    constructor(rc: ByteReadChannel){
+    constructor(rc: ByteReadChannel) {
 
     }
 
@@ -39,27 +39,23 @@ class BinaryReader {
 
     fun ReadString(): String = String(CharArray(read7BitEncodedInt()) { readChar() })
 
-    fun readInt(): Int {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    fun readByte(): Byte = ByteBuffer.wrap(baseStream!!.readNBytes(1)).get()
+    fun readByte(): Byte = baseStream!!.read().toByte()
 
     fun readBytes(count: Int): ByteArray = ByteArray(count) { readByte() }
 
-    fun readChar(): Char = ByteBuffer.wrap(baseStream!!.readNBytes(1)).get().toChar()
+    fun readChar(): Char = readByte().toChar()
 
     fun readInt32(): Int = ByteBuffer.wrap(readBytes(Int.SIZE_BYTES)).order(ByteOrder.LITTLE_ENDIAN).int
 
-    fun readInt16(): Short {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    fun readInt16(): Short = ByteBuffer.wrap(readBytes(Short.SIZE_BYTES)).order(ByteOrder.LITTLE_ENDIAN).short
+
+    fun readBoolean(): Boolean = readByte() != 0.toByte()
+
+    fun <T> readEnum(): T {
+        val b = readByte().toInt()
+
+        return b as T
     }
 
-    fun ReadInt32(): Int {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    fun readBoolean(): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
+    fun readLong(): Long = ByteBuffer.wrap(readBytes(Long.SIZE_BYTES)).order(ByteOrder.LITTLE_ENDIAN).long
 }

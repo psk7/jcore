@@ -1,15 +1,17 @@
 package pvt.psk.jcore.network
 
 import kotlinx.atomicfu.*
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
+import java.net.*
 
 class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IChannel, logger: Logger?) :
-    PeerProtocol(selfHostID, domain, controlChannel, logger) {
+        PeerProtocol(selfHostID, domain, controlChannel, logger) {
 
     private val _curseqid = atomic(0)
 
@@ -27,11 +29,12 @@ class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IC
 
         return if (keep) when (id) {
             CommandID.Discovery -> DiscoveryCommand(fromHost, toHost)
-            CommandID.Leave     -> LeaveCommand(fromHost, toHost)
-            CommandID.HostInfo  -> HostInfoCommand(Reader.readInt32(), fromHost, Reader.deserialize(fromHost), toHost)
-            CommandID.Ping      -> PingCommand(fromHost, toHost, AckToken(Reader))
+            CommandID.Leave -> LeaveCommand(fromHost, toHost)
+            CommandID.HostInfo -> HostInfoCommand(Reader.readInt32(), fromHost, Reader.deserialize(fromHost), toHost,
+                                                  CompletableDeferred<InetSocketAddress>())
+            CommandID.Ping -> PingCommand(fromHost, toHost, AckToken(Reader))
             CommandID.PingReply -> PingReplyCommand(fromHost, toHost, AckToken(Reader))
-            else                -> null
+            else -> null
         } else null
     }
 
@@ -52,12 +55,12 @@ class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IC
         th.serialize(Writer)
 
         when (Command) {
-            is HostInfoCommand  -> {
+            is HostInfoCommand -> {
                 Writer.write(_curseqid.getAndIncrement())
                 Command.serialize(Writer)
             }
 
-            is PingCommand      -> Command.Token.toStream(Writer.baseStream)
+            is PingCommand -> Command.Token.toStream(Writer.baseStream)
             is PingReplyCommand -> Command.Token.toStream(Writer.baseStream)
         }
     }

@@ -13,7 +13,7 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
 
     val logCat: String = "Peer"
 
-    val HostID: HostID
+    protected val selfHostID: HostID
     protected val ControlBus: Router
     protected var PeerProto: PeerProtocol? = null
     protected var ComSocket: PeerCommandSocket? = null
@@ -25,14 +25,14 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
     private val channels = Hashtable<String, BaseChannel>()
 
     init {
-        HostID = HostID(UUID.randomUUID(), Name)
+        selfHostID = HostID(UUID.randomUUID(), Name)
 
         ControlBus = Router()
 
     }
 
     open fun init() {
-        Log?.writeLog(LogImportance.Info, logCat, "Создан экземпляр $HostID")
+        Log?.writeLog(LogImportance.Info, logCat, "Создан экземпляр $selfHostID")
 
         PeerProto = createPeerProtocol(ControlBus, DomainName)
 
@@ -45,7 +45,7 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
             chanLock.write {
                 channels.getOrPut(channelName) { createChannel(channelName, Router()) }
             }.also {
-                PeerProto!!.sendHostInfo(pvt.psk.jcore.host.HostID.All)
+                PeerProto!!.sendHostInfo(HostID.All)
             }
 
     open fun close() {

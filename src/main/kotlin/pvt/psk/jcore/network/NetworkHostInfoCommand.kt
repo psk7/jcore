@@ -37,7 +37,7 @@ fun BinaryReader.deserialize(fromHost: HostID): Array<EndPointInfo> {
     val canrcvstream = readBoolean()
 
     return Array(readInt16().toInt()) {
-        create(ReadString(), ReadInt32(), readBoolean(), fromHost, canrcvstream)
+        create(ReadString(), readInt32(), readBoolean(), fromHost, canrcvstream)
     }
 }
 

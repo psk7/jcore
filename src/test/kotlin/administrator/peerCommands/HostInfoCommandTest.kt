@@ -23,7 +23,7 @@ class HostInfoCommandTest {
         h.addTask(j2)
         h.addTask(j3)
 
-        val fj = h.complete()
+        val fj = h.complete
 
         assertFalse(fj.isCompleted)
 

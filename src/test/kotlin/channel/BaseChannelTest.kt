@@ -2,7 +2,6 @@
 
 package channel
 
-import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import pvt.psk.jcore.administrator.*
@@ -32,7 +31,7 @@ class BaseChannelTest {
     }
 
     private class PP(val Self: HostID, Domain: String, ControlChannel: IChannel, Logger: Logger?) :
-        PeerProtocol(Self, Domain, ControlChannel, Logger) {
+            PeerProtocol(Self, Domain, ControlChannel, Logger) {
 
         override fun processHostInfoCommand(Command: HostInfoCommand) {}
 
@@ -48,8 +47,9 @@ class BaseChannelTest {
         }
     }
 
-    private class BC(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Data: Router, Logger: Logger?, CancellationToken: CancellationToken) :
-        BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
+    private class BC(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Data: Router, Logger: Logger?,
+                     CancellationToken: CancellationToken) :
+            BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
 
         init {
             initComplete()
@@ -61,12 +61,12 @@ class BaseChannelTest {
             throw Exception()
         }
 
-        override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
+        override suspend fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
             throw Exception()
         }
 
-        override fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): Deferred<EndPoint> {
-            return CompletableDeferred(EP(Data, Sender(), EndPointInfo.target))
+        override suspend fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
+            return EP(Data, Sender(), EndPointInfo.target)
         }
     }
 

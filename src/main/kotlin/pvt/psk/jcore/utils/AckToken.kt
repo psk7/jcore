@@ -7,11 +7,17 @@ import java.util.concurrent.atomic.*
 
 val cnt: AtomicLong = AtomicLong((UUID.randomUUID().hashCode().toLong() shl 32))
 
-class AckToken() {
+class AckToken {
 
-    constructor(reader: BinaryReader) : this() {}
+    constructor() {
+        ID = cnt.incrementAndGet()
+    }
 
-    val ID: Long = cnt.incrementAndGet()
+    constructor(reader: BinaryReader) {
+        ID = reader.readLong()
+    }
+
+    val ID: Long
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
