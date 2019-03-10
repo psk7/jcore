@@ -1,11 +1,13 @@
 package pvt.psk.jcore.channel
 
-import pvt.psk.jcore.host.*
 import java.util.concurrent.*
 import java.util.concurrent.atomic.*
 
 private val ids = AtomicInteger(1)
 
+/**
+ * Маршрутизатор сообщений
+ */
 class Router : IChannel {
 
     val lst = ConcurrentHashMap<Int, LocalChannel>()

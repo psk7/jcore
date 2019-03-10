@@ -1,8 +1,8 @@
 package utils
 
 import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions.*
 import pvt.psk.jcore.utils.*
-import kotlin.test.*
 
 class BinaryReaderTest {
 

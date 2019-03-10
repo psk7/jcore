@@ -2,12 +2,14 @@ package pvt.psk.jcore.channel
 
 import pvt.psk.jcore.host.*
 
-abstract class DataPacket(FromHost: HostID, ToHost: HostID, Metadata: Array<Any>? = null) : Message(FromHost, ToHost)
-{
-    val Metadata: Array<Any>? =
-        when
-        {
-            Metadata != null && Metadata.count() > 0 -> Metadata
-            else -> null
-        }
+/**
+ * Сообщение с прикрепленными к нему метаданными
+ */
+abstract class DataPacket(fromHost: HostID, toHost: HostID, metadata: Array<Any>? = null) : Message(fromHost, toHost) {
+
+    val metadata: Array<Any>? =
+            when {
+                metadata != null && metadata.count() > 0 -> metadata
+                else -> null
+            }
 }

@@ -80,8 +80,8 @@ class PeerProtocolTest {
         val dp = lst[0] as DiscoveryCommand
 
         // Discovery отсылается только в сеть
-        assertEquals(HostID.Network, dp.ToHost)
-        assertEquals(hid, dp.FromHost)
+        assertEquals(HostID.Network, dp.toHost)
+        assertEquals(hid, dp.fromHost)
     }
 
     @Test
@@ -104,8 +104,8 @@ class PeerProtocolTest {
         val dp = lst[0] as LeaveCommand
 
         // Leave отсылается только в сеть
-        assertEquals(HostID.Network, dp.ToHost)
-        assertEquals(hid, dp.FromHost)
+        assertEquals(HostID.Network, dp.toHost)
+        assertEquals(hid, dp.fromHost)
     }
 
     @Test
@@ -162,26 +162,26 @@ class PeerProtocolTest {
 
         // remote отсылал пакет с отправителя Local -> ALL. Формируется remote
         var c = D(HostID.Local, HostID.All)
-        assertEquals(HostID.Local, c!!.FromHost)
-        assertEquals(HostID.Local, c.ToHost)
+        assertEquals(HostID.Local, c!!.fromHost)
+        assertEquals(HostID.Local, c.toHost)
 
         // remote отсылал пакет со своего HostID -> ALL. Формируется remote
         c = D(remote, HostID.All)
-        assertEquals(remote, c!!.FromHost)
-        assertEquals(HostID.Local, c.ToHost)
+        assertEquals(remote, c!!.fromHost)
+        assertEquals(HostID.Local, c.toHost)
 
         assertNull(D(HostID.Local, HostID.Network))
         assertNull(D(remote, HostID.Network))
 
         // remote отсылал пакет с отправителя Local -> self. Формируется remote
         c = D(HostID.Local, self)
-        assertEquals(HostID.Local, c!!.FromHost)
-        assertEquals(HostID.Local, c.ToHost)
+        assertEquals(HostID.Local, c!!.fromHost)
+        assertEquals(HostID.Local, c.toHost)
 
         // remote отсылал пакет со своего HostID -> self. Формируется remote
         // приемник Local
         c = D(remote, self)
-        assertEquals(remote, c!!.FromHost)
-        assertEquals(HostID.Local, c.ToHost)
+        assertEquals(remote, c!!.fromHost)
+        assertEquals(HostID.Local, c.toHost)
     }
 }

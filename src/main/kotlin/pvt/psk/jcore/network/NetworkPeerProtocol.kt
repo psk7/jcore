@@ -43,11 +43,11 @@ class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IC
         Writer.write(Command.CommandID.ordinal.toByte())
         Writer.write(domain)
 
-        var fh = Command.FromHost
+        var fh = Command.fromHost
         if (fh == HostID.Local)
             fh = selfHostID
 
-        var th = Command.ToHost
+        var th = Command.toHost
         if (th == HostID.Network)
             th = HostID.All
 
@@ -60,8 +60,8 @@ class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IC
                 Command.serialize(Writer)
             }
 
-            is PingCommand -> Command.Token.toStream(Writer.baseStream)
-            is PingReplyCommand -> Command.Token.toStream(Writer.baseStream)
+            is PingCommand -> Command.token.toStream(Writer.baseStream)
+            is PingReplyCommand -> Command.token.toStream(Writer.baseStream)
         }
     }
 

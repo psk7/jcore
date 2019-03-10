@@ -61,11 +61,11 @@ class BaseChannelTest {
             throw Exception()
         }
 
-        override suspend fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
+        override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
             throw Exception()
         }
 
-        override suspend fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
+        override fun onHostCreate(command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
             return EP(Data, Sender(), EndPointInfo.target)
         }
     }
@@ -89,7 +89,7 @@ class BaseChannelTest {
 
         dr.getChannel({ _, p ->
                           when (p) {
-                              is NewHostInChannel -> newhost = p.FromHost
+                              is NewHostInChannel -> newhost = p.fromHost
                           }
                       })
 

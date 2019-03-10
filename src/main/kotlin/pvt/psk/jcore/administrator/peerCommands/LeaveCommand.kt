@@ -2,6 +2,11 @@ package pvt.psk.jcore.administrator.peerCommands
 
 import pvt.psk.jcore.host.*
 
-class LeaveCommand(FromHost: HostID, ToHost: HostID) : PeerCommand(CommandID.Leave, FromHost, ToHost) {
-    override fun toString(): String = "Leave Host=$FromHost"
+/**
+ * Команда - уведомление о завершении работы удаленного хоста
+ * @param fromHost Идентификатор хоста-отправителя команды
+ * @param toHost Идентификатор хоста-получателя команды
+ */
+class LeaveCommand(fromHost: HostID, toHost: HostID) : PeerCommand(CommandID.Leave, fromHost, toHost) {
+    override fun toString(): String = "Leave Host=$fromHost"
 }

@@ -39,8 +39,8 @@ private class FilteredChannel(val Source: IChannel) : IChannel {
         filters = filters.plusElement(filter)
     }
 
-    override fun getChannel(Received: DataReceived?, Description: String?): IChannelEndPoint {
-        return FilteredEndPoint(filters, Source, Received, Description)
+    override fun getChannel(received: DataReceived?, description: String?): IChannelEndPoint {
+        return FilteredEndPoint(filters, Source, received, description)
     }
 }
 
@@ -52,9 +52,9 @@ fun IChannel.filter(filter: Predicate<Message>): IChannel {
     return fch
 }
 
-fun IChannel.filterLocal() = filter { it.ToHost == HostID.Local }
+fun IChannel.filterLocal() = filter { it.toHost == HostID.Local }
 
-fun IChannel.acceptHost(accept: HostID) = filter { it.ToHost == HostID.All || it.ToHost == accept }
+fun IChannel.acceptHost(accept: HostID) = filter { it.toHost == HostID.All || it.toHost == accept }
 
 fun IChannel.filterLocal(received: DataReceived?) = filterLocal().getChannel(received)
 

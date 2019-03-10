@@ -1,10 +1,8 @@
 package pvt.psk.jcore.network
 
-import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.utils.*
-import java.net.*
 
 fun HostInfoCommand.serialize(writer: BinaryWriter) {
 
@@ -23,12 +21,6 @@ fun HostInfoCommand.serialize(writer: BinaryWriter) {
         }
 }
 
-fun HostInfoCommand.getSourceIPAddress(): Deferred<InetAddress> = (payload[0] as CompletableDeferred<InetAddress>)
-
-fun HostInfoCommand.setSourceIpAddress(Address: InetAddress) {
-    (payload[0] as CompletableDeferred<InetAddress>).complete(Address)
-}
-
 fun BinaryReader.deserialize(fromHost: HostID): Array<EndPointInfo> {
 
     // Версия упаковки
@@ -40,9 +32,3 @@ fun BinaryReader.deserialize(fromHost: HostID): Array<EndPointInfo> {
         create(ReadString(), readInt32(), readBoolean(), fromHost, canrcvstream)
     }
 }
-
-fun HostInfoCommand.create(SequenceID: Int, From: HostID, endPoints: Array<EndPointInfo>, SourceIPAddress: InetAddress, To: HostID): HostInfoCommand =
-    HostInfoCommand(SequenceID, From, endPoints, To, CompletableDeferred(SourceIPAddress)).also {
-        setSourceIpAddress(SourceIPAddress)
-    }
-

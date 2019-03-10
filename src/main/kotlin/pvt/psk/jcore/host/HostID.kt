@@ -3,9 +3,21 @@ package pvt.psk.jcore.host
 import pvt.psk.jcore.utils.*
 import java.util.*
 
+/**
+ * Уникальный идентификатор хоста
+ */
 class HostID {
+
+    /**
+     * Уникальный идентификатор хоста.
+     * Для идетификации используется **только** значение этого поля.
+     */
     val ID: UUID
-    val Name: String
+
+    /**
+     * Дополнительное имя хоста. Для идентификации **не используется**
+     */
+    val name: String
 
     val isNetwork: Boolean
         get() = this != Local
@@ -15,21 +27,36 @@ class HostID {
 
     constructor(ID: UUID, Name: String) {
         this.ID = ID
-        this.Name = Name
+        this.name = Name
     }
 
     constructor(Reader: BinaryReader) {
         ID = Reader.readUUID()
-        Name = Reader.ReadString()
+        name = Reader.ReadString()
     }
 
     companion object {
+        /**
+         * Идентифицирует **все** хосты в сети, в том числе еще неизвестные
+         */
         val All: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000000"), "*")
+
+        /**
+         * Идентифицирует самого себя
+         */
         val Local: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Local")
+
+        /**
+         * Идентифицирует **только** удаленные хосты в сети
+         */
         val Network: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000002"), "Network")
+
         val Unknown: HostID = HostID(UUID.fromString("00000000-0000-0000-0000-000000000003"), "Unknown")
     }
 
+    /**
+     * Сравнивает два идентификатор хоста. Сравнивается **только** поле ID
+     */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -45,10 +72,13 @@ class HostID {
         return ID.hashCode()
     }
 
-    override fun toString(): String = "$Name<${ID.toString().subSequence(0, 8)}>"
+    override fun toString(): String = "$name<${ID.toString().subSequence(0, 8)}>"
 
+    /**
+     * Сериализация идентификатора в двоичное представление
+     */
     fun serialize(writer: BinaryWriter) {
         writer.write(ID)
-        writer.write(Name)
+        writer.write(name)
     }
 }

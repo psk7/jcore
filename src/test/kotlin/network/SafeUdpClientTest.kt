@@ -20,14 +20,12 @@ class SafeUdpClientTest {
 
             assertFalse(sa.isUnresolved)
 
-            val c = SafeUdpClient(sa, CancellationToken.None)
+            val l = ConcurrentLinkedQueue<ByteArray>()
+
+            val c = SafeUdpClient(sa, CancellationToken.None) { dd, _ -> l += dd }
 
             val d = DatagramChannel.open()
             d.bind(InetSocketAddress("::", 0))
-
-            val l = ConcurrentLinkedQueue<ByteArray>()
-
-            c.received += { dd, _ -> l += dd }
 
             runBlocking {
 
@@ -54,14 +52,15 @@ class SafeUdpClientTest {
     @Test
     fun two() {
 
-        val c1 = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken.None)
-        val c2 = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken.None)
+        val c1 = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken.None) { d, a ->
+            println("$d from $a in c1")
+        }
+        val c2 = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken.None) { d, a ->
+            println("$d from $a in c2")
+        }
 
-        c1.received += { d, a -> println("$d from $a in c1") }
-        c2.received += { d, a -> println("$d from $a in c2") }
-
-        val p1 = (c1.localEndPoint() as InetSocketAddress).port
-        val p2 = (c2.localEndPoint() as InetSocketAddress).port
+        val p1 = c1.localEndPoint.port
+        val p2 = c2.localEndPoint.port
 
         for (i in 1..5) {
             c1.send(byteArrayOf(i.toByte()), InetSocketAddress("::1", p2))
@@ -96,8 +95,7 @@ class SafeUdpClientTest {
 
         try {
             var n = s.receive(p)
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             val a = 1
         }
 

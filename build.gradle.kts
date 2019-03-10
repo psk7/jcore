@@ -62,7 +62,7 @@ tasks.register("checkjvm") {
     }
 }
 
-tasks["compileKotlin"].dependsOn += "checkjvm"
+//tasks["compileKotlin"].dependsOn += "checkjvm"
 
 tasks {
     // Use the built-in JUnit support of Gradle.

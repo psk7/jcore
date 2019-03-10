@@ -18,8 +18,7 @@ class BinaryReader {
         baseStream = Stream
     }
 
-    constructor(rc: ByteReadChannel) {
-
+    constructor(@Suppress("UNUSED_PARAMETER") rc: ByteReadChannel) {
     }
 
     protected fun read7BitEncodedInt(): Int {
@@ -50,12 +49,6 @@ class BinaryReader {
     fun readInt16(): Short = ByteBuffer.wrap(readBytes(Short.SIZE_BYTES)).order(ByteOrder.LITTLE_ENDIAN).short
 
     fun readBoolean(): Boolean = readByte() != 0.toByte()
-
-    fun <T> readEnum(): T {
-        val b = readByte().toInt()
-
-        return b as T
-    }
 
     fun readLong(): Long = ByteBuffer.wrap(readBytes(Long.SIZE_BYTES)).order(ByteOrder.LITTLE_ENDIAN).long
 }

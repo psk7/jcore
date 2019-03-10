@@ -8,55 +8,51 @@ import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 
+/**
+ * Канал передачи сообщений на основе IP сетей
+ */
 class NetworkChannel(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Data: Router, HostID: HostID,
+                     private val directory: IPAddressDirectory,
                      Logger: Logger?, bindAddress: InetSocketAddress, CancellationToken: CancellationToken)
     : BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
 
-    val _nss: NetworkSenderSocket
-    val _ipl = IPEndPointsList()
-    val udp = SafeUdpClient(InetSocketAddress(InetAddress.getByName("::"), 0), CancellationToken)
+    private val _nss: NetworkSenderSocket
+
+    val basePort: Int
 
     init {
-        _nss = NetworkSenderSocket(udp, CancellationToken, _ipl, Logger)
+        _nss = NetworkSenderSocket(HostID, CancellationToken, Logger)
 
-        val nep = NetworkEndPoint(null, _nss, HostID, ControlBus)
-        nep.updateIPAddresses(InetSocketAddress(Inet6Address.getLoopbackAddress(), udp.localEndPoint.port))
+        basePort = _nss.basePort
 
-        super.localEndPoint = nep
+        directory.set(HostID, Inet6Address.getLoopbackAddress())
 
         initComplete()
     }
-
-    val networkLocalEndPoint: NetworkEndPoint
-        get() = super.localEndPoint as NetworkEndPoint
 
     override fun onHostRemove(host: EndPoint) {
         host.close()
     }
 
-    override suspend fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
-        val ha = InetSocketAddress(command.getSourceIPAddress().await(), endPointInfo.port)
+    override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
+        val ha = InetSocketAddress(directory.resolve(command.fromHost) ?: throw Exception(), endPointInfo.port)
 
-        _ipl.found(ha, endPoint);
+        if (endPoint !is NetworkEndPoint)
+            return
 
-        if (endPoint is NetworkEndPoint) {
-            endPoint.isReadOnly = endPointInfo.readOnly;
-            endPoint.updateIPAddresses(ha);
-        }
+        endPoint.isReadOnly = endPointInfo.readOnly;
     }
 
-    override suspend fun onHostCreate(Command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
+    override fun onHostCreate(command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
 
-        val ipe = InetSocketAddress(Command.getSourceIPAddress().await(), EndPointInfo.port)
+        val ipe = InetSocketAddress(directory.resolve(command.fromHost) ?: throw Exception(), EndPointInfo.port)
 
-        val hid = Command.FromHost
+        val hid = command.fromHost
 
-        val ep = NetworkEndPoint(Data, _nss, hid, ControlBus, true, canReceiveStream = EndPointInfo.canReceiveStream)
-        ep.updateIPAddresses(ipe)
+        val ep = NetworkEndPoint(Data, _nss, hid, directory, ipe.port, ControlBus, true,
+                                 canReceiveStream = EndPointInfo.canReceiveStream)
 
         Logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $ep в канале $Name")
-
-        _ipl.found(ipe, ep)
 
         return ep
     }

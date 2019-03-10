@@ -1,5 +1,6 @@
 package pvt.psk.jcore.utils
 
+import pvt.psk.jcore.host.*
 import java.io.*
 import java.nio.*
 import java.util.*
@@ -50,4 +51,6 @@ class BinaryWriter {
     fun toArray(): ByteArray = (baseStream as ByteArrayOutputStream).toByteArray()
 
     fun write(v: Double) = write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putDouble(v).array())
+
+    fun write(v: HostID) = v.serialize(this)
 }

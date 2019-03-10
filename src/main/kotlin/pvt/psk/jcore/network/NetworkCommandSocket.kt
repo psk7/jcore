@@ -9,17 +9,22 @@ import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
-import java.nio.*
 import java.util.concurrent.*
 
 class NetworkCommandSocket(Bus: IChannel,
                            AdmPort: Int,
                            Log: Logger?,
                            CommandFactory: IPeerCommandFactory,
+                           private val directory: IPAddressDirectory,
                            private val CancellationToken: CancellationToken) :
         PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken) {
 
     private val _unicastudp: SafeUdpClient
+
+    /**
+     * Multicast сокет. Используется **только** для приема широковещательной рассылки
+     * Отправка **всегда** через unicast
+     */
     private val _mcsocket: MulticastSocket
 
     private val _admpoints = ConcurrentHashMap<HostID, CommandEndPoints>()
@@ -30,7 +35,7 @@ class NetworkCommandSocket(Bus: IChannel,
     var IgnoreFromHost: HostID? = null
 
     init {
-        _unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false)
+        _unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, ::received)
 
         val cep = CommandEndPoints()
 
@@ -39,19 +44,13 @@ class NetworkCommandSocket(Bus: IChannel,
         _admpoints[HostID.All] = cep;
         _admpoints[HostID.Network] = cep;
 
-        _unicastudp.received += { data, from ->
-            GlobalScope.launch {
-                received(data, from)
-            }
-        }
-
         _mcsocket = MulticastSocket(AdmPort)
         _mcsocket.joinGroup(InetAddress.getByName("FF02::1"))
 
-        BeginReceive()
+        beginReceive()
     }
 
-    override fun BeginReceive() {
+    override fun beginReceive() {
         GlobalScope.launch(Dispatchers.IO) {
             val buf = ByteArray(16384)
 
@@ -84,19 +83,18 @@ class NetworkCommandSocket(Bus: IChannel,
         try {
             mtx.lock()
 
+            directory.set(cmd.fromHost, from.address)
+
             if (!CommandFactory.filter(cmd))
                 return
 
-            if (cmd is HostInfoCommand)
-                cmd.setSourceIpAddress(from.address)
-
             val ig = IgnoreFromHost
 
-            if (ig != null && ig == cmd.FromHost)
+            if (ig != null && ig == cmd.fromHost)
                 return
 
-            _admhosts.getOrPut(from) { cmd.FromHost }
-            _admpoints.getOrPut(cmd.FromHost) { CommandEndPoints().add(from) }
+            _admhosts.getOrPut(from) { cmd.fromHost }
+            _admpoints.getOrPut(cmd.fromHost) { CommandEndPoints().add(from) }
 
             onReceive(cmd)
         } finally {
