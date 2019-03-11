@@ -1,4 +1,4 @@
-package network
+package pvt.psk.jcore.network
 
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*

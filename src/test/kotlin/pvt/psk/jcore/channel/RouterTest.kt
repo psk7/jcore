@@ -1,4 +1,4 @@
-package channel
+package pvt.psk.jcore.channel
 
 import org.junit.jupiter.api.*
 import pvt.psk.jcore.channel.*

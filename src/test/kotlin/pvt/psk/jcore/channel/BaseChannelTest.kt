@@ -1,6 +1,6 @@
 @file:Suppress("UNUSED_VARIABLE")
 
-package channel
+package pvt.psk.jcore.channel
 
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*

@@ -1,4 +1,4 @@
-package utils
+package pvt.psk.jcore.utils
 
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.*

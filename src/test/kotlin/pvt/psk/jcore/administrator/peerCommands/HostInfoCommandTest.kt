@@ -1,4 +1,4 @@
-package administrator.peerCommands
+package pvt.psk.jcore.administrator.peerCommands
 
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.*

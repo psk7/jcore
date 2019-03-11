@@ -1,4 +1,4 @@
-package administrator
+package pvt.psk.jcore.administrator
 
 import org.joda.time.*
 import org.junit.jupiter.api.*

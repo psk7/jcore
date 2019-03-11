@@ -1,4 +1,4 @@
-package remoting
+package pvt.psk.jcore.remoting
 
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*

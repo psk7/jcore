@@ -1,4 +1,4 @@
-package remoting
+package pvt.psk.jcore.remoting
 
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.*

@@ -1,4 +1,4 @@
-package network
+package pvt.psk.jcore.network
 
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.*

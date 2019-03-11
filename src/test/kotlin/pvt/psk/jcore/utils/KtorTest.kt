@@ -1,4 +1,4 @@
-package utils
+package pvt.psk.jcore.utils
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*

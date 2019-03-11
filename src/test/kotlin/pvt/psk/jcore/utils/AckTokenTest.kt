@@ -1,4 +1,4 @@
-package utils
+package pvt.psk.jcore.utils
 
 import org.junit.jupiter.api.*
 import pvt.psk.jcore.utils.*
