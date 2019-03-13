@@ -25,13 +25,15 @@ class CancellationTokenSource {
 
     fun cancelAfter(delay: Duration) = cancelAfter(delay.toMillis())
 
-    fun cancelAfter(delay: Long) = GlobalScope.launch {
-        if (cancelreq)
-            return@launch
+    fun cancelAfter(delay: Long) {
+        GlobalScope.launch(Dispatchers.Unconfined) {
+            if (cancelreq)
+                return@launch
 
-        delay(delay)
+            delay(delay)
 
-        this@CancellationTokenSource.cancel()
+            this@CancellationTokenSource.cancel()
+        }
     }
 
     fun cancel() {

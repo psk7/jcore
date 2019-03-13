@@ -25,6 +25,9 @@ class HostID {
     val isLocal: Boolean
         get() = this == Local
 
+    val isBroadcast: Boolean
+        get() = this == All || this == Network
+
     constructor(ID: UUID, Name: String) {
         this.ID = ID
         this.name = Name

@@ -8,7 +8,7 @@ import kotlin.concurrent.*
 
 class IPAddressDirectory {
 
-    private class List {
+    private class List(val dir: IPAddressDirectory) {
         val l = HashSet<InetAddress>()
         val lock = ReentrantReadWriteLock()
 
@@ -17,7 +17,10 @@ class IPAddressDirectory {
         private fun ordered() = l.sortedByDescending { score(it) }.toTypedArray()
 
         private fun score(addr: InetAddress): Int {
-            val add = if (addr == last) 1 else 0
+            var add = if (addr == last) 1 else 0
+
+            if (dir.preferred.any { addr is Inet6Address && addr.scopeId == it })
+                add += 2
 
             return when {
                 addr.isLoopbackAddress -> 0
@@ -41,9 +44,17 @@ class IPAddressDirectory {
             get() = lock.read { field }
 
         fun getAll() = lock.read { ordered() }
+
+        fun reScore() {
+            lock.write {
+                primary = ordered().firstOrNull()
+            }
+        }
     }
 
     private val _list = ConcurrentHashMap<HostID, List>()
+
+    private var preferred = arrayOf<Int>()
 
     /**
      * Устанавливает соответствие между идентификатором хоста и IP адресом
@@ -51,7 +62,7 @@ class IPAddressDirectory {
      * @param host Идентификатор хоста
      * @param addr IP адрес хоста
      */
-    fun set(host: HostID, addr: InetAddress): Unit = _list.getOrPut(host) { List() }.set(addr)
+    fun set(host: HostID, addr: InetAddress): Unit = _list.getOrPut(host) { List(this) }.set(addr)
 
     /**
      * Возвращает предпочтительный IP адрес для указанного хоста
@@ -60,7 +71,7 @@ class IPAddressDirectory {
      *
      * @return Предпочтительный IP адрес
      */
-    fun resolve(host: HostID) = _list.getOrPut(host) { List() }.primary
+    fun resolve(host: HostID) = _list.getOrPut(host) { List(this) }.primary
 
     /**
      * Возвращает все адреса для указанного хоста, отсортированные в порядке предпочтительности
@@ -69,5 +80,13 @@ class IPAddressDirectory {
      *
      * @return Список адресов
      */
-    fun resolveAll(host: HostID) = _list.getOrPut(host) { List() }.getAll()
+    fun resolveAll(host: HostID) = _list.getOrPut(host) { List(this) }.getAll()
+
+    fun setPreferredInterfaces(preferred: Array<Int>) {
+        this.preferred = preferred
+
+        _list.values.forEach {
+            it.reScore()
+        }
+    }
 }

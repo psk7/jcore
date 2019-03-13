@@ -49,5 +49,8 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
     }
 
     fun send(data: ByteArray, target: SocketAddress): Unit =
-            _udp.outgoing.sendBlocking(Datagram(ByteReadPacket(data), target))
+            try {
+                _udp.outgoing.sendBlocking(Datagram(ByteReadPacket(data), target))
+            } catch (e: Exception) {
+            }
 }

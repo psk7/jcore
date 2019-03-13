@@ -12,14 +12,15 @@ import java.net.*
 import java.util.concurrent.*
 
 class NetworkCommandSocket(Bus: IChannel,
-                           AdmPort: Int,
+                           val admPort: Int,
                            Log: Logger?,
                            CommandFactory: IPeerCommandFactory,
                            private val directory: IPAddressDirectory,
                            private val CancellationToken: CancellationToken) :
         PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken) {
 
-    private val _unicastudp: SafeUdpClient
+    private val unicastudp: SafeUdpClient
+    private val admpoints = ConcurrentHashMap<HostID, Deferred<InetSocketAddress?>>()
 
     /**
      * Multicast сокет. Используется **только** для приема широковещательной рассылки
@@ -27,27 +28,104 @@ class NetworkCommandSocket(Bus: IChannel,
      */
     private val _mcsocket: MulticastSocket
 
-    private val _admpoints = ConcurrentHashMap<HostID, CommandEndPoints>()
-    private val _admhosts = ConcurrentHashMap<InetSocketAddress, HostID>()
+    private var multicasts = arrayOf<InetSocketAddress>()
 
     private val mtx = Mutex()
 
     var IgnoreFromHost: HostID? = null
 
     init {
-        _unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, ::received)
+        unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, ::received)
 
-        val cep = CommandEndPoints()
-
-        cep.add(InetSocketAddress(Inet6Address.getAllByName("[FF02::1]")[0], AdmPort));
-
-        _admpoints[HostID.All] = cep;
-        _admpoints[HostID.Network] = cep;
-
-        _mcsocket = MulticastSocket(AdmPort)
-        _mcsocket.joinGroup(InetAddress.getByName("FF02::1"))
+        _mcsocket = MulticastSocket(admPort)
 
         beginReceive()
+
+        scan()
+    }
+
+    fun scan() {
+        val mca = InetAddress.getByName("FF02::1")
+
+        val ifcs = NetworkInterface.getNetworkInterfaces().toList().filter {
+            !it.isLoopback && it.isUp && it.supportsMulticast() && !it.isPointToPoint &&
+                    !it.name.contains("radio", true)
+        }.toTypedArray()
+
+        ifcs.forEach {
+            Log?.writeLog(LogImportance.Info, LogCat, "Найден подходящий сетевой интерфейс $it %${it.index}")
+        }
+
+        val mcids = ifcs.map { it.index }.toIntArray()
+        mcids.forEach { z ->
+            try {
+                _mcsocket.joinGroup(InetSocketAddress(mca, admPort), ifcs.find { it.index == z })
+            } catch (e: SocketException) {
+            }
+        }
+
+        multicasts = mcids.map { InetSocketAddress(InetAddress.getByName("FF02::1%$it"), admPort) }.toTypedArray()
+    }
+
+    /**
+     * Асинхронное разрешение адреса управляющей конечной точки для удаленного хоста
+     *
+     * @param target Идентификатор хоста
+     *
+     * @return Управляющая конечная точка хоста
+     */
+    private suspend fun resolve(target: HostID): InetSocketAddress? {
+        val ep = admpoints.getOrPut(target) { GlobalScope.async(Dispatchers.Unconfined) { resolveInt(target) } }.await()
+
+        @Suppress("DeferredResultUnused")
+        if (ep == null)
+            admpoints.remove(target)
+
+        return ep
+    }
+
+    /**
+     * Асинхронное разрешение адреса управляющей конечной точки для удаленного хоста
+     *
+     * @param target Идентификатор хоста
+     *
+     * @return Управляющая конечная точка хоста
+     *
+     * Разрешение происходит путем групповой отправки команды Ping и ожидания ответа на нее.
+     * Ожидание ограничено 1 сек. Первый же ответ становится результатом операции, а остальные отбрасываются.
+     * Результат неудачного разрешения кешируется на 2 сек., а затем удаляется.
+     */
+    private suspend fun resolveInt(target: HostID): InetSocketAddress? {
+        Log?.writeLog(LogImportance.Info, LogCat, "Разрешение административной точки хоста $target")
+
+        val cd = CompletableDeferred<InetSocketAddress?>()
+
+        suspend fun onFound(j: Deferred<InetSocketAddress?>) {
+            val r = j.await()
+
+            if (r != null && cd.complete(r))
+                Log?.writeLog(LogImportance.Warning, LogCat,
+                              "Административная точка хоста $target найдена по адресу $r")
+        }
+
+        suspend fun notFound() {
+            delay(2000)
+
+            if (cd.complete(null))
+                Log?.writeLog(LogImportance.Warning, LogCat, "Административная точка хоста $target не найдена")
+        }
+
+        multicasts.forEach {
+            val (tk, j) = register<InetSocketAddress?>(CancellationTokenSource(1000).token)
+
+            onFound(j)
+
+            unicastudp.send(PingCommand(HostID.Local, target, tk).toBytes(CommandFactory), it)
+        }
+
+        notFound()
+
+        return cd.await()
     }
 
     override fun beginReceive() {
@@ -73,12 +151,28 @@ class NetworkCommandSocket(Bus: IChannel,
     }
 
     private suspend fun received(data: ByteArray, from: InetSocketAddress) {
+
         if (data.count() == 0)
             return
 
         val rd = BinaryReader(data)
 
         val cmd = CommandFactory.create(rd) ?: return
+
+        @Suppress("DeferredResultUnused")
+        admpoints.getOrPut(cmd.fromHost) { CompletableDeferred<InetSocketAddress?>(from) }
+
+        when (cmd) {
+            is PingCommand -> {
+                replyPing(cmd.fromHost, from, cmd.token)
+                return
+            }
+
+            is PingReplyCommand -> {
+                cmd.token.received(from)
+                return
+            }
+        }
 
         try {
             mtx.lock()
@@ -93,9 +187,6 @@ class NetworkCommandSocket(Bus: IChannel,
             if (ig != null && ig == cmd.fromHost)
                 return
 
-            _admhosts.getOrPut(from) { cmd.fromHost }
-            _admpoints.getOrPut(cmd.fromHost) { CommandEndPoints().add(from) }
-
             onReceive(cmd)
         } finally {
             if (cmd is HostInfoCommand)
@@ -105,16 +196,36 @@ class NetworkCommandSocket(Bus: IChannel,
         }
     }
 
+    /**
+     * Формирует команду PingReply для отправителя команды Ping с переданной меткой
+     *
+     *
+     * @param from Отправитель команды Ping
+     * @param to Адресат команды PingReply
+     * @param token Метка команды
+     */
+    private fun replyPing(from: HostID, to: InetSocketAddress, token: AckToken): Unit =
+            unicastudp.send(PingReplyCommand(HostID.Local, from, token).toBytes(CommandFactory), to)
+
     override fun send(datagram: ByteArray, target: HostID) {
-        if (!target.isNetwork)
-            return
 
-        val epl = _admpoints[target] ?: return
-        val send = epl.getPrimary() ?: return
+        fun send(send: InetSocketAddress?) {
+            if (send == null)
+                return
 
-        Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды по адресу $send");
+            Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды по адресу $send")
 
-        _unicastudp.send(datagram, send)
+            unicastudp.send(datagram, send)
+        }
+
+        if (target.isBroadcast)
+            multicasts.forEach(::send)
+        else {
+            GlobalScope.launch(Dispatchers.Unconfined) {
+                val tgt = resolve(target) ?: return@launch
+                send(tgt)
+            }
+        }
     }
 
     override fun dumpHostInfoCommand(cmd: HostInfoCommand) {

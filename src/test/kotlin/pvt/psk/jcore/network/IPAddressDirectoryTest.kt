@@ -39,7 +39,13 @@ class IPAddressDirectoryTest {
         assert("fe80::6cd6:8446:2406:655")
 
         // Последний установленный имеет дополнительный приоритет
-        d.set(h, InetAddress.getByName("fe80::6cd6:8446:2406:656"))
+        d.set(h, InetAddress.getByName("fe80::6cd6:8446:2406:656%10"))
         assert("fe80::6cd6:8446:2406:656")
+
+        d.set(h, InetAddress.getByName("fe80::6cd6:8446:2406:656%11"));
+        assert("fe80::6cd6:8446:2406:656%11");
+
+        d.setPreferredInterfaces(arrayOf( 10 ))
+        assert("fe80::6cd6:8446:2406:656%10");
     }
 }

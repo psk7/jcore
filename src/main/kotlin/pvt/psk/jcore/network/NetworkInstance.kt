@@ -26,4 +26,11 @@ open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: 
                            pvt.psk.jcore.utils.CancellationToken.None)
 
     override fun createPollCommand(): PollCommand = NetworkPollCommand()
+
+    /**
+     * Повторное сканирование и настройка сетевых интерфейсов
+     */
+    fun rescan() {
+        (ComSocket as? NetworkCommandSocket)?.scan()
+    }
 }
