@@ -2,6 +2,7 @@ package pvt.psk.jcore.channel
 
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
+import pvt.psk.jcore.utils.*
 
 fun IChannelEndPoint.sendHostInfo(command: HostInfoCommand) {
     sendMessage(command)
@@ -57,5 +58,15 @@ fun IChannel.filterLocal() = filter { it.toHost == HostID.Local }
 fun IChannel.acceptHost(accept: HostID) = filter { it.toHost == HostID.All || it.toHost == accept }
 
 fun IChannel.filterLocal(received: DataReceived?) = filterLocal().getChannel(received)
+
+fun IChannelEndPoint.sendMessage(toHost: HostID, block: BinaryWriter.() -> Unit): IChannelEndPoint {
+    val wr = BinaryWriter()
+
+    wr.block()
+
+    sendMessage(BytesPacket(wr.toArray(), HostID.Local, toHost))
+
+    return this
+}
 
 

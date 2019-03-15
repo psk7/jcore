@@ -10,6 +10,7 @@ import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 import java.util.concurrent.*
+import kotlin.coroutines.*
 
 class NetworkCommandSocket(Bus: IChannel,
                            val admPort: Int,
@@ -17,7 +18,10 @@ class NetworkCommandSocket(Bus: IChannel,
                            CommandFactory: IPeerCommandFactory,
                            private val directory: IPAddressDirectory,
                            private val CancellationToken: CancellationToken) :
-        PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken) {
+        PeerCommandSocket(Bus, Log, CommandFactory, CancellationToken), CoroutineScope {
+
+    override val coroutineContext: CoroutineContext
+        get() = Dispatchers.Unconfined
 
     private val unicastudp: SafeUdpClient
     private val admpoints = ConcurrentHashMap<HostID, Deferred<InetSocketAddress?>>()
@@ -75,7 +79,7 @@ class NetworkCommandSocket(Bus: IChannel,
      * @return Управляющая конечная точка хоста
      */
     private suspend fun resolve(target: HostID): InetSocketAddress? {
-        val ep = admpoints.getOrPut(target) { GlobalScope.async(Dispatchers.Unconfined) { resolveInt(target) } }.await()
+        val ep = admpoints.getOrPut(target) { resolveAsync(target) }.await()
 
         @Suppress("DeferredResultUnused")
         if (ep == null)
@@ -95,37 +99,32 @@ class NetworkCommandSocket(Bus: IChannel,
      * Ожидание ограничено 1 сек. Первый же ответ становится результатом операции, а остальные отбрасываются.
      * Результат неудачного разрешения кешируется на 2 сек., а затем удаляется.
      */
-    private suspend fun resolveInt(target: HostID): InetSocketAddress? {
+    private fun resolveAsync(target: HostID): Deferred<InetSocketAddress?> {
         Log?.writeLog(LogImportance.Info, LogCat, "Разрешение административной точки хоста $target")
 
         val cd = CompletableDeferred<InetSocketAddress?>()
 
-        suspend fun onFound(j: Deferred<InetSocketAddress?>) {
-            val r = j.await()
+        multicasts.forEach {
+            val (tk, j) = register<InetSocketAddress?>(CancellationTokenSource(1000).token)
 
-            if (r != null && cd.complete(r))
-                Log?.writeLog(LogImportance.Warning, LogCat,
-                              "Административная точка хоста $target найдена по адресу $r")
+            launch {
+                val r = j.await()
+
+                if (r != null && cd.complete(r))
+                    Log?.writeLog(LogImportance.Warning, LogCat, "Административная точка хоста $target найдена по адресу $r")
+            }
+
+            unicastudp.send(PingCommand(HostID.Local, target, tk).toBytes(CommandFactory), it)
         }
 
-        suspend fun notFound() {
+        launch {
             delay(2000)
 
             if (cd.complete(null))
                 Log?.writeLog(LogImportance.Warning, LogCat, "Административная точка хоста $target не найдена")
         }
 
-        multicasts.forEach {
-            val (tk, j) = register<InetSocketAddress?>(CancellationTokenSource(1000).token)
-
-            onFound(j)
-
-            unicastudp.send(PingCommand(HostID.Local, target, tk).toBytes(CommandFactory), it)
-        }
-
-        notFound()
-
-        return cd.await()
+        return cd
     }
 
     override fun beginReceive() {

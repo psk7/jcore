@@ -1,11 +1,11 @@
 package pvt.psk.jcore.utils
 
+import kotlinx.atomicfu.*
 import java.io.*
 import java.nio.*
 import java.util.*
-import java.util.concurrent.atomic.*
 
-val cnt: AtomicLong = AtomicLong((UUID.randomUUID().hashCode().toLong() shl 32))
+private val cnt = atomic((UUID.randomUUID().hashCode().toLong() shl 32))
 
 class AckToken {
 
@@ -36,4 +36,6 @@ class AckToken {
     fun toStream(stream: OutputStream) {
         stream.write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(ID).array())
     }
+
+    override fun toString(): String = "Token #${ID and 0xFFFFFFFF} in ${(ID shr 32)}"
 }

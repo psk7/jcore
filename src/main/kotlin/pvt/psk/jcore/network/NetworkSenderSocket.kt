@@ -41,7 +41,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
         logger?.writeLog(LogImportance.Info, logCat, "Открыт UDP сокет по адресу ${udp.localEndPoint}")
 
         //tcp = aSocket(ActorSelectorManager(Dispatchers.IO)).tcp().bind(InetSocketAddress("::", 0))
-        //GlobalScope.launch(Dispatchers.IO) { beginAccept() } <- for stream over tcp
+        //launch(Dispatchers.IO) { beginAccept() } <- for stream over tcp
     }
 
     private suspend fun beginAccept() {
@@ -168,9 +168,9 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
     private fun resolve(remote: InetSocketAddress): Deferred<NetworkEndPoint?> {
 
         return _endpoints.getOrPut(remote) {
-            val t = GlobalScope.async(Dispatchers.Unconfined) { resolveIPEndPoint(remote) }
+            val t = async { resolveIPEndPoint(remote) }
 
-            GlobalScope.launch(Dispatchers.Unconfined) {
+            launch {
                 if (t.await() != null)
                     return@launch
 

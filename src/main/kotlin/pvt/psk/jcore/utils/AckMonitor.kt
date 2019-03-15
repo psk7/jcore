@@ -21,7 +21,7 @@ fun <T> register(): Pair<AckToken, Deferred<T>> {
 
     _lst[tk] = cd
 
-    return Pair(tk, GlobalScope.async { cd.await() as T })
+    return Pair(tk, GlobalScope.async(Dispatchers.Unconfined) { cd.await() as T })
 }
 
 fun <T> AckToken.received(Data: T) {

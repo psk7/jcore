@@ -43,8 +43,7 @@ abstract class BaseChannel(val Name: String,
         cbEp = ControlBus.filterLocal(::controlReceived)
     }
 
-    fun getChannel(received: DataReceived? = null, description: String? = null): IChannelEndPoint = Data.getChannel(
-            received, description)
+    fun getChannel(description: String? = null, received: DataReceived? = null): IChannelEndPoint = Data.getChannel(received, description)
 
     protected abstract fun processPollCommand(command: PollCommand)
 
@@ -95,7 +94,7 @@ abstract class BaseChannel(val Name: String,
 
             onHostRemove(f)
 
-            Logger?.writeLog(LogImportance.Info, logCat, "Хост ${fh.name}<${fh.ID}> удален из канала $Name")
+            Logger?.writeLog(LogImportance.Info, logCat, "Хост $fh удален из канала $Name")
 
             if (_l.count() == 0)
                 close()
@@ -107,7 +106,7 @@ abstract class BaseChannel(val Name: String,
                 _l[fh] = onHostCreate(command, chen)
 
                 command.addFinalizer {
-                    Logger?.writeLog(LogImportance.Info, logCat, "Хост ${fh.name}<${fh.ID}> добавлен в канал ${Name}")
+                    Logger?.writeLog(LogImportance.Info, logCat, "Хост $fh добавлен в канал $Name")
 
                     Peer.sendHostInfo(fh)
 
