@@ -1,72 +1,48 @@
 package pvt.psk.jcore.network
 
-import kotlinx.atomicfu.*
+import io.ktor.util.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
+import pvt.psk.jcore.network.commands.*
 import pvt.psk.jcore.utils.*
-import java.net.*
 
-class NetworkPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IChannel, logger: Logger?) :
-        PeerProtocol(selfHostID, domain, controlChannel, logger) {
+@KtorExperimentalAPI
+@ExperimentalCoroutinesApi
+class NetworkPeerProtocol(selfHostID: HostID, controlChannel: IChannel, logger: Logger?) :
+        PeerProtocol(selfHostID, controlChannel, logger) {
 
-    private val _curseqid = atomic(0)
+    private val mtx = Mutex()
 
-    override fun create(Reader: BinaryReader): PeerCommand? {
+    override fun onControlReceived(command: PeerCommand) {
 
-        val id = CommandID.values()[Reader.readByte().toInt()]
+        if (!command.toHost.isLocal)
+            return
 
-        val dom = Reader.ReadString()
+        logger?.writeLog(LogImportance.Trace, logCat, "Принята команда $command для ${command.toHost}")
 
-        if (dom != domain)
-            return null
+        if (command is NetworkPingReplyCommand)
+            command.token.received(command.from)
 
-        val fromHost = HostID(Reader);
-        val (keep, toHost) = adjustTargetHost(fromHost, HostID(Reader))
+        GlobalScope.launch(Dispatchers.Unconfined) {
+            mtx.lock()
 
-        return if (keep) when (id) {
-            CommandID.Discovery -> DiscoveryCommand(fromHost, toHost)
-            CommandID.Leave -> LeaveCommand(fromHost, toHost)
-            CommandID.HostInfo -> HostInfoCommand(Reader.readInt32(), fromHost, Reader.deserialize(fromHost), toHost,
-                                                  CompletableDeferred<InetSocketAddress>())
-            CommandID.Ping -> PingCommand(fromHost, toHost, AckToken(Reader))
-            CommandID.PingReply -> PingReplyCommand(fromHost, toHost, AckToken(Reader))
-            else -> null
-        } else null
-    }
+            try {
+                if (!filter(command))
+                    return@launch
 
-    override fun serialize(Command: PeerCommand, Writer: BinaryWriter) {
+                super.onControlReceived(command)
+            } finally {
+                command.complete()
 
-        Writer.write(Command.CommandID.ordinal.toByte())
-        Writer.write(domain)
-
-        var fh = Command.fromHost
-        if (fh == HostID.Local)
-            fh = selfHostID
-
-        var th = Command.toHost
-        if (th == HostID.Network)
-            th = HostID.All
-
-        fh.serialize(Writer)
-        th.serialize(Writer)
-
-        when (Command) {
-            is HostInfoCommand -> {
-                Writer.write(_curseqid.getAndIncrement())
-                Command.serialize(Writer)
+                mtx.unlock()
             }
-
-            is PingCommand -> Command.token.toStream(Writer.baseStream)
-            is PingReplyCommand -> Command.token.toStream(Writer.baseStream)
         }
     }
 
     override fun createPollCommand(): PollCommand = NetworkPollCommand()
-
-    override fun processHostInfoCommand(Command: HostInfoCommand) {
-    }
 }

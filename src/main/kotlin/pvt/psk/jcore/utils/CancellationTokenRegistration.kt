@@ -1,6 +1,9 @@
 package pvt.psk.jcore.utils
 
-class CancellationTokenRegistration(private val cancellationTokenSource: CancellationTokenSource, val safeClose: () -> Unit) {
+import kotlinx.coroutines.*
+
+@ExperimentalCoroutinesApi
+class CancellationTokenRegistration(@Suppress("unused") private val cancellationTokenSource: CancellationTokenSource, val safeClose: () -> Unit) {
 
     var closed = false
 
@@ -10,8 +13,7 @@ class CancellationTokenRegistration(private val cancellationTokenSource: Cancell
 
         try {
             safeClose()
-        }
-        catch (e: Throwable) {
+        } catch (e: Throwable) {
 
         }
     }

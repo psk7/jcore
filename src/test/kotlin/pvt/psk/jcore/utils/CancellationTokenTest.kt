@@ -3,9 +3,9 @@ package pvt.psk.jcore.utils
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import pvt.psk.jcore.utils.*
 import java.time.*
 
+@ExperimentalCoroutinesApi
 class CancellationTokenTest {
 
     @Test
@@ -61,7 +61,7 @@ class CancellationTokenTest {
     fun register2() {
 
         val ccts = CancellationTokenSource()
-        val cct = ccts.token
+        @Suppress("UNUSED_VARIABLE") val cct = ccts.token
 
         val cts = CancellationTokenSource()
         val ct = cts.token
@@ -79,7 +79,7 @@ class CancellationTokenTest {
         // Попытка регистрации отмены на CancellationToken.None должна игнорироваться
         val ct = CancellationToken.None
 
-        var r = ct.register {
+        @Suppress("UNUSED_VARIABLE") var r = ct.register {
             throw Exception()
         }
     }

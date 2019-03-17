@@ -1,3 +1,5 @@
+@file:Suppress("UNUSED_PARAMETER")
+
 package pvt.psk.jcore.remoting
 
 import java.lang.reflect.*

@@ -1,29 +1,33 @@
 package pvt.psk.jcore.network
 
+import io.ktor.util.*
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.instance.*
 import pvt.psk.jcore.logger.*
-import java.net.*
+import pvt.psk.jcore.network.commands.*
 
+@KtorExperimentalAPI
+@ExperimentalCoroutinesApi
 open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: Logger?)
     : BaseInstance(Name, DomainName, AdmPort, Log) {
 
     private val _directory = IPAddressDirectory()
+    private lateinit var _cf: NetworkCommandFactory
 
-    override fun createPeerProtocol(Control: IChannel, Domain: String): PeerProtocol = NetworkPeerProtocol(selfHostID,
-                                                                                                           Domain,
-                                                                                                           Control, Log)
+    override fun createPeerProtocol(Control: IChannel, Domain: String): PeerProtocol {
+
+        _cf = NetworkCommandFactory(selfHostID, DomainName, Control)
+
+        return NetworkPeerProtocol(selfHostID, Control, Log)
+    }
 
     override fun createPeerCommandSocket(): PeerCommandSocket =
-            NetworkCommandSocket(ControlBus, AdmPort, Log, PeerProto!!, _directory, CancellationToken).apply {
-                IgnoreFromHost = selfHostID
-            }
+            NetworkCommandSocket(controlBus, AdmPort, Log, _directory, CancellationToken)
 
     override fun createChannel(channelName: String, channelRouter: Router): BaseChannel =
-            NetworkChannel(channelName, PeerProto!!, ControlBus, channelRouter, selfHostID, _directory, Log,
-                           InetSocketAddress(Inet6Address.getByName("::"), 0),
-                           pvt.psk.jcore.utils.CancellationToken.None)
+            NetworkChannel(channelName, controlBus, channelRouter, selfHostID, _directory, Log, pvt.psk.jcore.utils.CancellationToken.None)
 
     override fun createPollCommand(): PollCommand = NetworkPollCommand()
 

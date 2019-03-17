@@ -1,10 +1,12 @@
+@file:Suppress("UNUSED_VARIABLE", "TestFunctionName")
+
 package pvt.psk.jcore.utils
 
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import pvt.psk.jcore.utils.*
 
+@ExperimentalCoroutinesApi
 class AckMonitorTest {
     @Test
     fun Test() = runBlocking {

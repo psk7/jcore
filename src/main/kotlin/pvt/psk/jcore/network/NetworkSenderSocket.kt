@@ -1,5 +1,6 @@
 package pvt.psk.jcore.network
 
+import io.ktor.util.*
 import kotlinx.coroutines.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
@@ -11,6 +12,8 @@ import java.util.concurrent.*
 /**
  * Представляет точку обмена трафиком пользовательского канала
  */
+@ExperimentalCoroutinesApi
+@KtorExperimentalAPI
 class NetworkSenderSocket(private val selfId: HostID, cancellationToken: CancellationToken, logger: Logger?) :
         SenderSocket(cancellationToken, logger) {
 
@@ -44,6 +47,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
         //launch(Dispatchers.IO) { beginAccept() } <- for stream over tcp
     }
 
+    @Suppress("unused", "RedundantSuspendModifier")
     private suspend fun beginAccept() {
 
 /*        val s = tcp.accept()
@@ -112,7 +116,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
      *
      * Уведомляет асинхронно ожидающих его прихода
      */
-    private fun pingReply(reader: BinaryReader, from: InetSocketAddress) = AckToken(reader).received(reader)
+    private fun pingReply(reader: BinaryReader, @Suppress("UNUSED_PARAMETER") from: InetSocketAddress) = AckToken(reader).received(reader)
 
     /**
      * Асинхронно разрешает сетевой адрес в объект конечной точки канала
@@ -165,6 +169,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
      *
      * @return Объект ожидания завершения операции разрешения адреса
      */
+    @Suppress("DeferredIsResult")
     private fun resolve(remote: InetSocketAddress): Deferred<NetworkEndPoint?> {
 
         return _endpoints.getOrPut(remote) {
@@ -200,7 +205,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
 
     /**
      * Передача датаграммы удаленному хосту
-     * @param Data Передаваемые данные
+     * @param data Передаваемые данные
      * @param Target Адрес точки приема удаленного хоста
      */
     override fun sendDatagram(data: BytesPacket, Target: EndPoint) {
@@ -209,7 +214,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
             return
 
         val d = data.data
-        val tgt = Target.target
+        val tgt = Target.target ?: return
 
         val wr = BinaryWriter()
 

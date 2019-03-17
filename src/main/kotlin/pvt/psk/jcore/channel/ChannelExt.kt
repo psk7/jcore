@@ -1,62 +1,62 @@
 package pvt.psk.jcore.channel
 
-import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.utils.*
 
-fun IChannelEndPoint.sendHostInfo(command: HostInfoCommand) {
-    sendMessage(command)
-    command.release()
-}
+typealias Predicate<P> = (P) -> Boolean
 
-typealias Predicate<T> = (T) -> Boolean
+private class FilteredChannel<T>(val source: IChannel) : IChannel where T : Message {
 
-private class FilteredChannel(val Source: IChannel) : IChannel {
-
-    private class FilteredEndPoint(val Filters: Array<Predicate<Message>>,
-                                   Source: IChannel,
-                                   val Received: DataReceived?,
-                                   val Description: String?) : IChannelEndPoint {
+    private class FilteredEndPoint<TT>(val Filters: Array<Predicate<TT>>,
+                                       Source: IChannel,
+                                       val Received: DataReceived?,
+                                       @Suppress("unused") val Description: String?) : IChannelEndPoint where TT : Message {
 
         val source: IChannelEndPoint
 
         init {
-            source = Source.getChannel(::onReceived)
+            source = Source.getChannel({ c, m ->
+                                           @Suppress("UNUSED_VARIABLE", "UNCHECKED_CAST") val mm = m as TT
+                                           onReceived(c, m)
+                                       })
         }
 
-        fun onReceived(channel: IChannelEndPoint, packet: Message) {
+        fun onReceived(channel: IChannelEndPoint, packet: TT) {
             if (Received != null && Filters.all { it(packet) })
                 Received.invoke(channel, packet)
         }
 
-        override fun sendMessage(Data: Message) = source.sendMessage(Data)
+        override fun sendMessage(message: Message) = source.sendMessage(message)
 
         override fun close() = source.close()
     }
 
-    var filters = arrayOf<Predicate<Message>>()
+    var filters = arrayOf<Predicate<T>>()
 
-    fun addFilter(filter: Predicate<Message>) {
+    fun addFilter(filter: Predicate<T>) {
         filters = filters.plusElement(filter)
     }
 
     override fun getChannel(received: DataReceived?, description: String?): IChannelEndPoint {
-        return FilteredEndPoint(filters, Source, received, description)
+        return FilteredEndPoint(filters, source, received, description)
     }
+
+    override fun sendMessage(message: Message) = source.sendMessage(message)
+
+    override fun close() {}
 }
 
-fun IChannel.filter(filter: Predicate<Message>): IChannel {
-    val fch = if (this is FilteredChannel) this else FilteredChannel(this)
+@Suppress("UNCHECKED_CAST")
+fun <T> IChannel.filter(filter: Predicate<T>): IChannel where T : Message =
+        (this as? FilteredChannel<T> ?: FilteredChannel(this)).apply {
+            addFilter(filter)
+        }
 
-    fch.addFilter(filter)
+fun IChannel.filterLocal() = filter<DirectedMessage> { it.toHost == HostID.Local }
 
-    return fch
-}
+fun IChannel.acceptHost(accept: HostID) = filter<DirectedMessage> { it.toHost == HostID.All || it.toHost == accept }
 
-fun IChannel.filterLocal() = filter { it.toHost == HostID.Local }
-
-fun IChannel.acceptHost(accept: HostID) = filter { it.toHost == HostID.All || it.toHost == accept }
-
+@Suppress("unused")
 fun IChannel.filterLocal(received: DataReceived?) = filterLocal().getChannel(received)
 
 fun IChannelEndPoint.sendMessage(toHost: HostID, block: BinaryWriter.() -> Unit): IChannelEndPoint {

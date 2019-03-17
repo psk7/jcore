@@ -1,51 +1,50 @@
+@file:Suppress("UNUSED_PARAMETER", "UNUSED_VARIABLE", "NAME_SHADOWING", "UNCHECKED_CAST")
+
 package pvt.psk.jcore.administrator
 
-import org.joda.time.*
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
-import pvt.psk.jcore.host.HostID
+import pvt.psk.jcore.channel.commands.*
+import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 import java.util.*
+import java.util.concurrent.*
 
-private class TestLogger(val prefix: String) : Logger() {
-    override fun writeLog(TimeStamp: DateTime, importance: LogImportance, logCat: String, message: String) {
-        println(message)
-    }
-}
-
-private class TestPeerProtocol(selfHostID: HostID, domain: String, controlChannel: IChannel, logger: Logger?) :
-    PeerProtocol(selfHostID, domain, controlChannel, logger) {
-    override fun create(Reader: BinaryReader): PeerCommand? {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override fun serialize(Command: PeerCommand, Writer: BinaryWriter) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override fun processHostInfoCommand(Command: HostInfoCommand) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
+@ExperimentalCoroutinesApi
+private class TestPeerProtocol(selfHostID: HostID, controlChannel: IChannel, logger: Logger?) :
+        PeerProtocol(selfHostID, controlChannel, logger) {
 
     override fun createPollCommand(): PollCommand = TestPollCommand(selfHostID)
 }
 
 private class TestHostInfoCommand(SequenceID: Int, FromHost: HostID, endPoints: Array<EndPointInfo>, ToHost: HostID,
                                   vararg payload: Array<Any>) :
-    HostInfoCommand(SequenceID, FromHost, endPoints, ToHost, *payload) {
+        HostInfoCommand(SequenceID, FromHost, endPoints, ToHost, *payload) {
 }
 
-private class TestPollCommand(ToHost: HostID) : PollCommand(HostID.Local, ToHost) {
+@ExperimentalCoroutinesApi
+private class TestPollCommand(ToHost: HostID) : PollCommand() {
     override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
         return TestHostInfoCommand(SeqID, FromHost, arrayOf(), ToHost)
     }
 }
 
+private class MsgQueue() : LinkedBlockingQueue<Message>() {
+
+    fun <T> tryGetMessage(): T where T : Message {
+
+        assertFalse(isEmpty())
+
+        return take() as T
+    }
+}
+
+@ExperimentalCoroutinesApi
 class PeerProtocolTest {
 
     @Test
@@ -55,7 +54,7 @@ class PeerProtocolTest {
 
         val hid = HostID(UUID.randomUUID(), "Host")
 
-        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
+        val pp = TestPeerProtocol(hid, r, l)
 
         assertEquals(hid, pp.selfHostID)
     }
@@ -67,7 +66,7 @@ class PeerProtocolTest {
 
         val hid = HostID(UUID.randomUUID(), "Host")
 
-        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
+        val pp = TestPeerProtocol(hid, r, l)
 
         val lst = mutableListOf<Message>()
 
@@ -85,30 +84,6 @@ class PeerProtocolTest {
     }
 
     @Test
-    fun leave() {
-        val l = TestLogger("P1")
-        val r = Router()
-
-        val hid = HostID(UUID.randomUUID(), "Host")
-
-        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
-
-        val lst = mutableListOf<Message>()
-
-        val dc = r.getChannel({ _, p -> lst.add(p) })
-
-        pp.leave()
-
-        assertEquals(1, lst.size)
-
-        val dp = lst[0] as LeaveCommand
-
-        // Leave отсылается только в сеть
-        assertEquals(HostID.Network, dp.toHost)
-        assertEquals(hid, dp.fromHost)
-    }
-
-    @Test
     fun onDiscovery() {
         val l = TestLogger("P1")
         val r = Router()
@@ -117,7 +92,7 @@ class PeerProtocolTest {
         val fromhost = HostID(UUID.randomUUID(), "FromHost")
         val fromip = InetSocketAddress(Inet6Address.getLoopbackAddress(), 1111)
 
-        val pp = TestPeerProtocol(hid, "TestDomain", r, l)
+        val pp = TestPeerProtocol(hid, r, l)
 
         val lst = mutableListOf<Message>()
 
@@ -145,11 +120,11 @@ class PeerProtocolTest {
 
     @Test
     fun adjustTargetHost() {
-        var r = Router()
-        var remote = HostID(UUID.randomUUID(), "Remote")
-        var self = HostID(UUID.randomUUID(), "Self")
+        val r = Router()
+        val remote = HostID(UUID.randomUUID(), "Remote")
+        val self = HostID(UUID.randomUUID(), "Self")
 
-        var pp = TestPeerProtocol(self, "TestDomain", r, null)
+        val pp = TestPeerProtocol(self, r, null)
 
         val D = { f: HostID, t: HostID ->
             val r = pp.adjustTargetHost(f, t)
@@ -183,5 +158,119 @@ class PeerProtocolTest {
         c = D(remote, self)
         assertEquals(remote, c!!.fromHost)
         assertEquals(HostID.Local, c.toHost)
+    }
+
+    @Test
+    fun onHostInfo() {
+        var seq = 0
+        val l = TestLogger("P1")
+        val r = Router()
+
+        val hid = HostID(UUID.randomUUID(), "Host")
+        val rh1 = HostID(UUID.randomUUID(), "Remote1")
+        val rh2 = HostID(UUID.randomUUID(), "Remote2")
+        val rh3 = HostID(UUID.randomUUID(), "Remote3")
+
+        val pp = TestPeerProtocol(hid, r, l)
+
+        val lst = MsgQueue()
+
+        val bc1 = BaseChannelTest.BC("Chan1", Router(), Router(), null, CancellationToken.None)
+        val bc2 = BaseChannelTest.BC("Chan2", Router(), Router(), null, CancellationToken.None)
+        val bc3 = BaseChannelTest.BC("Chan3", Router(), Router(), null, CancellationToken.None)
+
+        // ReSharper disable once UnusedVariable
+        val dc = r.getChannel({ _, p ->
+                                  when (p) {
+                                      is PollCommand -> {
+                                          p.registerChannel("Chan1", bc1)
+                                          p.registerChannel("Chan2", bc2)
+                                          p.registerChannel("Chan3", bc3)
+                                      }
+
+                                      is HostInfoCommand -> {
+                                      }
+
+                                      else -> lst.add(p)
+                                  }
+                              })
+
+        val ep1 = EndPointInfo(rh1, "Chan1", false)
+        val ep2 = EndPointInfo(rh2, "Chan2", false)
+        val ep3 = EndPointInfo(rh2, "Chan1", false)
+        val ep4 = EndPointInfo(rh3, "Chan1", false)
+        val ep5 = EndPointInfo(rh1, "Chan3", false)
+
+        // Добавлен rh1 в канал Chan1
+        dc.sendMessage(HostInfoCommand(++seq, rh1, arrayOf(ep1), HostID.Local))
+
+        var cmd = lst.tryGetMessage<NewHostInChannelCommand>()
+        assertEquals(rh1, cmd.endPointInfo.target)
+        assertEquals("Chan1", cmd.endPointInfo.channelName)
+
+        // Добавлен rh2 в канал Chan2
+        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(ep2), HostID.Local))
+
+        cmd = lst.tryGetMessage()
+        assertEquals(rh2, cmd.endPointInfo.target)
+        assertEquals("Chan2", cmd.endPointInfo.channelName)
+
+        // Повторим предыдущую команду
+        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(ep2), HostID.Local))
+
+        // Должно прийти обновление канала
+        var cmdu = lst.tryGetMessage<UpdateHostInChannelCommand>()
+        assertEquals(rh2, cmdu.endPointInfo.target)
+        assertEquals("Chan2", cmdu.endPointInfo.channelName)
+
+        // Добавлен rh2 в канал Chan1
+        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(ep2, ep3), HostID.Local))
+
+        cmdu = lst.tryGetMessage()
+        assertEquals(rh2, cmdu.endPointInfo.target)
+        assertEquals("Chan2", cmdu.endPointInfo.channelName)
+        cmd = lst.tryGetMessage()
+        assertEquals(rh2, cmd.endPointInfo.target)
+        assertEquals("Chan1", cmd.endPointInfo.channelName)
+
+        // Добавлен rh3 в канал Chan1
+        dc.sendMessage(HostInfoCommand(++seq, rh3, arrayOf(ep4), HostID.Local))
+
+        cmd = lst.tryGetMessage()
+        assertEquals(rh3, cmd.endPointInfo.target)
+        assertEquals("Chan1", cmd.endPointInfo.channelName)
+
+        // rh2 вышел из всех каналов
+        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(), HostID.Local))
+
+        var cmdl = lst.tryGetMessage<HostLeaveChannelCommand>()
+        assertEquals(rh2, cmdl.leavedHost)
+        assertEquals("Chan2", cmdl.channel)
+        cmdl = lst.tryGetMessage()
+        assertEquals(rh2, cmdl.leavedHost)
+        assertEquals("Chan1", cmdl.channel)
+
+        // Повторим предыдущую команду
+        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(), HostID.Local))
+
+        // Ничего не должно произойти
+        assertTrue(lst.isEmpty())
+
+        // rh1 вышел из Chan1 и зашел в Chan3
+        dc.sendMessage(HostInfoCommand(++seq, rh1, arrayOf(ep5), HostID.Local))
+        cmd = lst.tryGetMessage()
+        assertEquals(rh1, cmd.endPointInfo.target)
+        assertEquals("Chan3", cmd.endPointInfo.channelName)
+        cmdl = lst.tryGetMessage()
+        assertEquals(rh1, cmdl.leavedHost)
+        assertEquals("Chan1", cmdl.channel)
+
+        // rh1 вышел из всех каналов
+        dc.sendMessage(HostInfoCommand(++seq, rh1, arrayOf(), HostID.Local))
+        cmdl = lst.tryGetMessage()
+        assertEquals(rh1, cmdl.leavedHost)
+        assertEquals("Chan3", cmdl.channel)
+
+        assertTrue(lst.isEmpty())
     }
 }

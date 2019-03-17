@@ -1,30 +1,36 @@
 package pvt.psk.jcore.administrator
 
+import kotlinx.atomicfu.*
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
+import pvt.psk.jcore.channel.commands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
+import java.util.*
 import java.util.concurrent.*
-import java.util.concurrent.atomic.*
+import kotlin.collections.HashSet
 
 /**
  * Протокол обмена информацией о соседних хостах
  */
-abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlChannel: IChannel,
-                            val logger: Logger?) : IPeerCommandFactory {
+@ExperimentalCoroutinesApi
+abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, val logger: Logger?) {
 
     val logCat: String = "Peer"
 
     data class HostData(var lastSequenceID: Int)
 
-    val hosts = ConcurrentHashMap<HostID, HostData>()
-    val curseqid = AtomicInteger(1)
+    private val hosts = ConcurrentHashMap<HostID, HostData>()
+    private val curseqid = atomic(1)
+    private val _chans = Hashtable<String, HashSet<HostID>>()
 
+    @Suppress("MemberVisibilityCanBePrivate")
     protected val Control: IChannelEndPoint
 
     init {
-        Control = controlChannel.filterLocal().getChannel(::controlReceived)
+        Control = controlChannel.getChannel(::controlReceived)
     }
 
     /**
@@ -32,43 +38,25 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
      */
     fun discovery() = Control.sendMessage(DiscoveryCommand(selfHostID, HostID.Network))
 
-    /**
-     * Отправка команды Leave удаленным хостам
-     */
-    fun leave() = Control.sendMessage(LeaveCommand(selfHostID, HostID.Network))
-
     fun getHosts(): Array<HostID> = hosts.keys.toTypedArray()
 
     private fun controlReceived(@Suppress("UNUSED_PARAMETER") channel: IChannelEndPoint, packet: Message) {
-        val fh = packet.fromHost
-        var th = packet.toHost
-
-        if (th == HostID.All || th == HostID.Local)
-            th = selfHostID
-
-        if (fh == selfHostID)
+        if (packet !is PeerCommand || !packet.toHost.isLocal)
             return
 
-        // Посторонние команды отбрасываются
-        if (fh != selfHostID && th != selfHostID)
-            return
-
-        onControlReceived(packet, fh)
+        onControlReceived(packet)
     }
 
     /**
      * Диспетчеризация полученных команд протокола
      * @param command Принятая команда
-     * @param fromHost Идентификатор хоста источника команды
      */
-    protected open fun onControlReceived(command: Message, fromHost: HostID) {
+    protected open fun onControlReceived(command: PeerCommand) {
 
         when (command) {
-            is DiscoveryCommand -> onDiscovery(fromHost)
-            is HostInfoCommand -> onHostInfo(command, fromHost)
-            is LeaveCommand -> onLeave(fromHost)
+            is DiscoveryCommand -> onDiscovery(command.fromHost)
+            is HostInfoCommand -> onHostInfo(command)
             is PingCommand -> onPing(command)
-            is PingReplyCommand -> onPingReply(command)
         }
     }
 
@@ -92,32 +80,63 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
     /**
      * Обработка команды HostInfoCommand
      */
-    private fun onHostInfo(HostInfo: HostInfoCommand, FromHost: HostID) {
+    private fun onHostInfo(hostInfo: HostInfoCommand) {
 
-        var isHostKnown: Boolean
+        val msgs = onHostInfoInt(hostInfo)
 
-        synchronized(hosts) {
-            var hd = hosts.get(FromHost)
-            isHostKnown = hd != null
+        msgs.forEach { Control.sendMessage(it) }
 
-            if (!isHostKnown) {
-                hd = HostData(HostInfo.SequenceID)
-                hosts[FromHost] = hd
-            } else if (HostInfo.SequenceID <= hd!!.lastSequenceID)
-                return
+        if (msgs.any { it is NewHostInChannelCommand })
+            sendHostInfo(hostInfo.fromHost)
+    }
 
-            hd.lastSequenceID = HostInfo.SequenceID
+    private fun onHostInfoInt(hostInfo: HostInfoCommand) = synchronized(_chans) {
+
+        val l = mutableListOf<Message>()
+
+        val src = hostInfo.fromHost
+
+        // Выясняем в каких каналах сейчас состоим
+        val np = createPollCommand()
+        Control.sendMessage(np)
+
+        // Создаем записи в карте при необходимости
+        np.channels.forEach {
+            if (!_chans.containsKey(it.first))
+                _chans[it.first] = HashSet()
         }
 
-        if (!isHostKnown) {
-            logger?.writeLog(LogImportance.Info, logCat, "В домене обнаружен хост $FromHost")
+        // Работаем только с теми каналами, которые нам известны
+        val fep = hostInfo.endPoints.filter { _chans.containsKey(it.channelName) }.toTypedArray()
 
-            onNewHost(FromHost)
-        }
+        // Каналы в которых источник состоял
+        val was = _chans.filter { c -> c.value.contains(src) }.keys.toTypedArray()
 
-        processHostInfoCommand(HostInfo)
+        // Каналы в которых источник состоит теперь
+        val nc = fep.map { it.channelName }.toTypedArray()
 
-        onHostInfo(HostInfo)
+        // Каналы из которых источник вышел
+        val lc = was.filter { !nc.contains(it) }.toTypedArray()
+
+        // Каналы в которые источник вошел
+        @Suppress("UNUSED_VARIABLE")
+        val ec = nc.filter { !was.contains(it) }.toTypedArray()
+
+        l.addAll(nc.map { chan ->
+            val ep = fep.firstOrNull { it.channelName == chan }!!
+            if (_chans[chan]!!.add(src))
+                NewHostInChannelCommand(ep, hostInfo.completion)
+            else
+                UpdateHostInChannelCommand(ep)
+        })
+
+        l.addAll(lc.mapNotNull { chan ->
+            if (_chans[chan]!!.remove(src))
+                HostLeaveChannelCommand(src, chan)
+            else null
+        })
+
+        return@synchronized l
     }
 
     /**
@@ -125,10 +144,10 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
      *
      * Команды HostInfoCommand должны обрабатываться точно в том же порядке, в котором были созданы.
      * Причем опоздавшие команды уже не актуальны.
-     * Фильтрация осуществляется на основе поля SequenceID.
-     * Принятые команды со значением SequenceID меньшим или равным уже обработанной **отбрасываются**.
+     * Фильтрация осуществляется на основе поля sequenceID.
+     * Принятые команды со значением sequenceID меньшим или равным уже обработанной **отбрасываются**.
      */
-    override fun filter(command: PeerCommand): Boolean {
+    fun filter(command: PeerCommand): Boolean {
 
         if (command !is HostInfoCommand)
             return true
@@ -140,36 +159,19 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
             isHostKnown = hd != null
 
             if (!isHostKnown) {
-                hd = HostData(command.SequenceID)
+                hd = HostData(command.sequenceID)
                 hosts[command.fromHost] = hd
-            } else if (command.SequenceID <= hd!!.lastSequenceID) {
+            } else if (command.sequenceID <= hd!!.lastSequenceID) {
                 logger?.writeLog(LogImportance.Info, logCat,
-                                 "Команда $command проигнорирована из-за значения SeqID=${command.SequenceID} <= ${hd.lastSequenceID}")
+                                 "Команда $command проигнорирована из-за значения SeqID=${command.sequenceID} <= ${hd.lastSequenceID}")
                 return false
             }
 
-            hd.lastSequenceID = command.SequenceID
+            hd.lastSequenceID = command.sequenceID
         }
 
         return true
     }
-
-    /**
-     * Обработка команды LeaveCommand
-     */
-    private fun onLeave(LeavingHost: HostID) {
-
-        val rl = synchronized(hosts) { hosts.remove(LeavingHost) != null }
-
-        if (rl)
-            logger?.writeLog(LogImportance.Info, logCat, "Хост {$LeavingHost} покидает домен")
-
-        onLeaveHost(LeavingHost)
-    }
-
-    protected open fun onHostInfo(Command: HostInfoCommand): Unit = Unit
-    protected open fun onNewHost(FromHost: HostID): Unit = Unit
-    protected open fun onLeaveHost(FromHost: HostID): Unit = Unit
 
     /**
      * Отправки инфомации о конечных точках указанному хосту
@@ -183,7 +185,7 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
 
         Control.sendMessage(np)
 
-        Control.sendHostInfo(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, toHost))
+        Control.sendMessage(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, toHost))
     }
 
     fun adjustTargetHost(From: HostID, To: HostID): Pair<Boolean, HostID> {
@@ -215,9 +217,8 @@ abstract class PeerProtocol(val selfHostID: HostID, val domain: String, controlC
      * Обработка команды PingReplyCommand
      * Информирует ожидающих о поступлении команды
      */
+    @Suppress("unused")
     private fun onPingReply(PingReply: PingReplyCommand) = PingReply.token.received(true)
-
-    protected abstract fun processHostInfoCommand(Command: HostInfoCommand)
 }
 
 

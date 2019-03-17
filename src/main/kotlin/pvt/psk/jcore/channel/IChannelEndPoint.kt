@@ -5,7 +5,7 @@ interface IChannelEndPoint {
     /**
      * Отправка сообщения в канал
      */
-    fun sendMessage(Data: Message)
+    fun sendMessage(message: Message)
 
     /**
      * Закрытие канала

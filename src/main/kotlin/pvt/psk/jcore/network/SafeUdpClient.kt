@@ -2,18 +2,21 @@ package pvt.psk.jcore.network
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
+import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.io.core.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 
+@ExperimentalCoroutinesApi
+@KtorExperimentalAPI
 class SafeUdpClient(BindEndPoint: InetSocketAddress,
                     val CancellationToken: CancellationToken,
                     val IsMulticast: Boolean = false,
                     private val received: suspend (ByteArray, InetSocketAddress) -> Unit) {
 
-    val selector = ActorSelectorManager(Dispatchers.IO)
+    private val selector = ActorSelectorManager(Dispatchers.IO)
     private val _udp: BoundDatagramSocket
 
     val localEndPoint: InetSocketAddress

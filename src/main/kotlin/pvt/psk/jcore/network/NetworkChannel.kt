@@ -1,5 +1,7 @@
 package pvt.psk.jcore.network
 
+import io.ktor.util.*
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
@@ -11,11 +13,15 @@ import java.net.*
 /**
  * Канал передачи сообщений на основе IP сетей
  */
-class NetworkChannel(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Data: Router, HostID: HostID,
-                     private val directory: IPAddressDirectory,
-                     Logger: Logger?, bindAddress: InetSocketAddress, CancellationToken: CancellationToken)
-    : BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
+@KtorExperimentalAPI
+@ExperimentalCoroutinesApi
+class NetworkChannel(Name: String, ControlBus: IChannel, Data: Router,
+                     HostID: HostID, private val directory: IPAddressDirectory,
+                     Logger: Logger?,
+                     CancellationToken: CancellationToken)
+    : BaseChannel(Name, ControlBus, Data, Logger, CancellationToken) {
 
+    @Suppress("JoinDeclarationAndAssignment")
     private val _nss: NetworkSenderSocket
 
     val basePort: Int
@@ -34,30 +40,29 @@ class NetworkChannel(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Dat
         host.close()
     }
 
-    override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
-        val ha = InetSocketAddress(directory.resolve(command.fromHost) ?: throw Exception(), endPointInfo.port)
+    override fun onHostUpdate(endPointInfo: EndPointInfo, endPoint: EndPoint) {
+        //val ha = InetSocketAddress(directory.resolve(endPointInfo.target) ?: throw Exception(), endPointInfo.port)
 
         if (endPoint !is NetworkEndPoint)
             return
 
-        endPoint.isReadOnly = endPointInfo.readOnly;
+        endPoint.isReadOnly = endPointInfo.readOnly
     }
 
-    override fun onHostCreate(command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
+    override fun onHostCreate(endPointInfo: EndPointInfo): EndPoint {
 
-        val ipe = InetSocketAddress(directory.resolve(command.fromHost) ?: throw Exception(), EndPointInfo.port)
+        val ipe = InetSocketAddress(directory.resolve(endPointInfo.target) ?: throw Exception(), endPointInfo.port)
 
-        val hid = command.fromHost
+        val hid = endPointInfo.target
 
-        val ep = NetworkEndPoint(Data, _nss, hid, directory, ipe.port, ControlBus, true,
-                                 canReceiveStream = EndPointInfo.canReceiveStream)
+        val ep = NetworkEndPoint(data, _nss, hid, directory, ipe.port, controlBus, true, endPointInfo.canReceiveStream)
 
-        Logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $ep в канале $Name")
+        logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $ep в канале $name")
 
         return ep
     }
 
     override fun processPollCommand(command: PollCommand) {
-        command.registerChannel(Name, this)
+        command.registerChannel(name, this)
     }
 }

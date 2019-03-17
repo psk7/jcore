@@ -1,3 +1,5 @@
+@file:Suppress("UNUSED_PARAMETER", "FunctionName")
+
 package pvt.psk.jcore.remoting
 
 import pvt.psk.jcore.utils.*

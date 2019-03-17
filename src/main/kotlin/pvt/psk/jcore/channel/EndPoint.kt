@@ -2,13 +2,16 @@ package pvt.psk.jcore.channel
 
 import pvt.psk.jcore.host.*
 
-abstract class EndPoint(val dataChannel: IChannel?, protected val sender: ISender, val targetHost: HostID, val canReceiveStream: Boolean = false) {
+abstract class EndPoint(@Suppress("CanBeParameter") private val dataChannel: IChannel?,
+                        @Suppress("MemberVisibilityCanBePrivate") protected val sender: ISender, val targetHost: HostID,
+                        @Suppress("unused") val canReceiveStream: Boolean = false) {
 
     protected val Data = dataChannel?.getChannel(::send)
 
     private var isClosed = false
 
-    fun send(channel: IChannelEndPoint, message: Message) {
+    @Suppress("MemberVisibilityCanBePrivate")
+    fun send(@Suppress("UNUSED_PARAMETER") channel: IChannelEndPoint, message: Message) {
         if (isClosed)
             return
 

@@ -3,7 +3,6 @@ package pvt.psk.jcore.network
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import pvt.psk.jcore.host.*
-import pvt.psk.jcore.network.*
 import java.net.*
 import java.util.*
 
@@ -13,6 +12,8 @@ class IPAddressDirectoryTest {
     fun scoring() {
         val d = IPAddressDirectory()
         val h = HostID(UUID.randomUUID(), "H1")
+
+        assertNull(d.resolve(h))
 
         fun assert(addr: String) = assertEquals(InetAddress.getByName(addr), d.resolve(h))
 
@@ -42,10 +43,13 @@ class IPAddressDirectoryTest {
         d.set(h, InetAddress.getByName("fe80::6cd6:8446:2406:656%10"))
         assert("fe80::6cd6:8446:2406:656")
 
-        d.set(h, InetAddress.getByName("fe80::6cd6:8446:2406:656%11"));
-        assert("fe80::6cd6:8446:2406:656%11");
+        d.set(h, InetAddress.getByName("fe80::6cd6:8446:2406:656%11"))
+        assert("fe80::6cd6:8446:2406:656%11")
 
-        d.setPreferredInterfaces(arrayOf( 10 ))
-        assert("fe80::6cd6:8446:2406:656%10");
+        d.setPreferredInterfaces(arrayOf(10))
+        assert("fe80::6cd6:8446:2406:656%10")
+
+        d.reset()
+        assertNull(d.resolve(h))
     }
 }

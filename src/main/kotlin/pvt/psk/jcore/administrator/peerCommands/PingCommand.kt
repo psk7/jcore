@@ -9,4 +9,4 @@ import pvt.psk.jcore.utils.*
  * @param toHost Идентификатор хоста-получателя команды
  * @param token Метка команды
  */
-class PingCommand(fromHost: HostID, toHost: HostID, val token: AckToken) : PeerCommand(CommandID.Ping, fromHost, toHost)
+open class PingCommand(fromHost: HostID, toHost: HostID, val token: AckToken) : PeerCommand(CommandID.Ping, fromHost, toHost)

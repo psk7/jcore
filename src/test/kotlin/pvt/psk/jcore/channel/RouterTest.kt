@@ -1,13 +1,12 @@
 package pvt.psk.jcore.channel
 
 import org.junit.jupiter.api.*
-import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import java.util.*
 import org.junit.jupiter.api.Assertions.*
 
 class RouterTest {
-    class TestMessage(val Value: String, ToHost: HostID) : Message(HostID.Local, ToHost)
+    class TestMessage(val Value: String, ToHost: HostID) : DirectedMessage(HostID.Local, ToHost)
 
     fun compare(List: MutableList<TestMessage>, vararg inds: Int) {
         assert(List.count() == inds.count())

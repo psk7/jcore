@@ -1,17 +1,18 @@
-@file:Suppress("UNUSED_VARIABLE")
+@file:Suppress("UNUSED_VARIABLE", "UNUSED_PARAMETER")
 
 package pvt.psk.jcore.channel
 
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
-import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.util.*
 
+@ExperimentalCoroutinesApi
 class BaseChannelTest {
 
     private class Sender : ISender {
@@ -23,33 +24,24 @@ class BaseChannelTest {
     private class EP(Data: IChannel, Sender: ISender, TargetHost: HostID) : EndPoint(Data, Sender, TargetHost) {
     }
 
-    private class PC(val _fromHost: HostID, ToHost: HostID) : PollCommand(_fromHost, ToHost) {
+    @ExperimentalCoroutinesApi
+    private class PC(val _fromHost: HostID, ToHost: HostID) : PollCommand() {
 
         override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
             return HostInfoCommand(2, _fromHost, arrayOf(), HostID.Local)
         }
     }
 
-    private class PP(val Self: HostID, Domain: String, ControlChannel: IChannel, Logger: Logger?) :
-            PeerProtocol(Self, Domain, ControlChannel, Logger) {
-
-        override fun processHostInfoCommand(Command: HostInfoCommand) {}
+    @ExperimentalCoroutinesApi
+    private class PP(val Self: HostID, ControlChannel: IChannel, Logger: Logger?) :
+            PeerProtocol(Self, ControlChannel, Logger) {
 
         override fun createPollCommand(): PollCommand = PC(Self, HostID.Local)
-
-        //override fun Create(CommandID: CommandID, From: HostID, To: HostID): PeerCommand = TODO()
-        //override fun Create(BinaryReader Reader): PeerCommand => throw new NotImplementedException();
-
-        override fun serialize(Command: PeerCommand, Writer: BinaryWriter) = TODO()
-
-        override fun create(Reader: BinaryReader): PeerCommand? {
-            TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-        }
     }
 
-    private class BC(Name: String, Peer: PeerProtocol, ControlBus: IChannel, Data: Router, Logger: Logger?,
-                     CancellationToken: CancellationToken) :
-            BaseChannel(Name, Peer, ControlBus, Data, Logger, CancellationToken) {
+    @ExperimentalCoroutinesApi
+    class BC(Name: String, ControlBus: IChannel, Data: Router, Logger: Logger?, CancellationToken: CancellationToken) :
+            BaseChannel(Name, ControlBus, Data, Logger, CancellationToken) {
 
         init {
             initComplete()
@@ -61,12 +53,12 @@ class BaseChannelTest {
             throw Exception()
         }
 
-        override fun onHostUpdate(command: HostInfoCommand, endPointInfo: EndPointInfo, endPoint: EndPoint) {
+        override fun onHostUpdate(endPointInfo: EndPointInfo, endPoint: EndPoint) {
             throw Exception()
         }
 
-        override fun onHostCreate(command: HostInfoCommand, EndPointInfo: EndPointInfo): EndPoint {
-            return EP(Data, Sender(), EndPointInfo.target)
+        override fun onHostCreate(endPointInfo: EndPointInfo): EndPoint {
+            return EP(data, Sender(), endPointInfo.target)
         }
     }
 
@@ -78,8 +70,8 @@ class BaseChannelTest {
         val self = HostID(UUID.randomUUID(), "Self")
         val rh = HostID(UUID.randomUUID(), "Remote")
 
-        val pp = PP(self, "Domain", cr, null)
-        val bc = BC("Channel", pp, cr, dr, null, CancellationToken.None)
+        val pp = PP(self, cr, null)
+        val bc = BC("Channel", cr, dr, null, CancellationToken.None)
 
         val cc = cr.getChannel()
 
@@ -93,7 +85,7 @@ class BaseChannelTest {
                           }
                       })
 
-        cc.sendHostInfo(hi)
+        cc.sendMessage(hi)
 
         assertEquals(rh, newhost)
     }

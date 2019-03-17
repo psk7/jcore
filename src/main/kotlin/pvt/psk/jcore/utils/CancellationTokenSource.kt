@@ -4,6 +4,7 @@ import kotlinx.coroutines.*
 import java.time.*
 import java.util.concurrent.*
 
+@ExperimentalCoroutinesApi
 class CancellationTokenSource {
 
     private var cancelreq = false

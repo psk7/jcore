@@ -1,54 +1,30 @@
 package pvt.psk.jcore.administrator
 
-import pvt.psk.jcore.administrator.peerCommands.*
+import kotlinx.coroutines.*
 import pvt.psk.jcore.channel.*
-import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 
-abstract class PeerCommandSocket protected constructor(val Bus: IChannel,
-                                                       val Log: Logger?,
-                                                       val CommandFactory: IPeerCommandFactory,
-                                                       CancellationToken: CancellationToken) {
+@ExperimentalCoroutinesApi
+abstract class PeerCommandSocket constructor(Bus: IChannel,
+                                             val Log: Logger?,
+                                             @Suppress("UNUSED_PARAMETER") CancellationToken: CancellationToken) {
 
-    private val _bus: IChannelEndPoint
+    protected val bus: IChannelEndPoint
 
     init {
-        _bus = Bus.getChannel(::onBusCmd)
+        bus = Bus.getChannel(::onBusCmd)
     }
 
-    protected val LogCat: String = "PeerCmd"
+    protected val logCat: String = "PeerCmd"
 
-    private fun onBusCmd(channel: IChannelEndPoint, data: Message) {
-        if (data !is PeerCommand || !data.toHost.isNetwork)
-            return
-
-        Log?.writeLog(LogImportance.Trace, LogCat, "Отправка команды $data. Хосту ${data.toHost}")
-
-        if (data is HostInfoCommand)
-            dumpHostInfoCommand(data)
-
-        val wr = BinaryWriter()
-
-        CommandFactory.serialize(data, wr)
-
-        val dg = wr.toArray()
-
-        send(dg, data.toHost)
-    }
-
-    protected abstract fun send(datagram: ByteArray, target: HostID)
+    protected abstract fun onBusCmd(channel: IChannelEndPoint, data: Message)
 
     protected fun onReceive(Message: Message) {
-        Log?.writeLog(LogImportance.Trace, LogCat, "Принята команда $Message для ${Message.toHost}")
+        Log?.writeLog(LogImportance.Trace, logCat, "Принята команда $Message")
 
-        if (Message is HostInfoCommand)
-            dumpHostInfoCommand(Message)
-
-        _bus.sendMessage(Message)
+        bus.sendMessage(Message)
     }
-
-    abstract fun dumpHostInfoCommand(cmd: HostInfoCommand)
 
     abstract fun beginReceive()
 }

@@ -50,6 +50,13 @@ class IPAddressDirectory {
                 primary = ordered().firstOrNull()
             }
         }
+
+        fun reset() {
+            lock.write {
+                l.clear()
+                primary = null
+            }
+        }
     }
 
     private val _list = ConcurrentHashMap<HostID, List>()
@@ -88,5 +95,12 @@ class IPAddressDirectory {
         _list.values.forEach {
             it.reScore()
         }
+    }
+
+    /**
+     * Сброс карты соответствий
+     */
+    fun reset() {
+        _list.values.toList().forEach { it.reset() }
     }
 }

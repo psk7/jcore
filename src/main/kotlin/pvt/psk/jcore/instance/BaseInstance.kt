@@ -1,5 +1,6 @@
 package pvt.psk.jcore.instance
 
+import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
@@ -9,12 +10,14 @@ import java.util.*
 import java.util.concurrent.locks.*
 import kotlin.concurrent.*
 
+@ExperimentalCoroutinesApi
 abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: Int, val Log: Logger?) {
 
     val logCat: String = "Peer"
 
-    protected val selfHostID: HostID
-    protected val ControlBus: Router
+    protected val selfHostID = HostID(UUID.randomUUID(), Name)
+    protected val controlBus = Router()
+
     protected var PeerProto: PeerProtocol? = null
     protected var ComSocket: PeerCommandSocket? = null
 
@@ -24,17 +27,10 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
     private val chanLock = ReentrantReadWriteLock()
     private val channels = Hashtable<String, BaseChannel>()
 
-    init {
-        selfHostID = HostID(UUID.randomUUID(), Name)
-
-        ControlBus = Router()
-
-    }
-
     open fun init() {
         Log?.writeLog(LogImportance.Info, logCat, "Создан экземпляр $selfHostID")
 
-        PeerProto = createPeerProtocol(ControlBus, DomainName)
+        PeerProto = createPeerProtocol(controlBus, DomainName)
 
         ComSocket = createPeerCommandSocket()
 
@@ -49,9 +45,6 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
             }
 
     open fun close() {
-
-        PeerProto?.leave()
-
         cancellationSource.cancel()
     }
 

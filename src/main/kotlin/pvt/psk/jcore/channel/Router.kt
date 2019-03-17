@@ -1,16 +1,16 @@
 package pvt.psk.jcore.channel
 
+import kotlinx.atomicfu.*
 import java.util.concurrent.*
-import java.util.concurrent.atomic.*
 
-private val ids = AtomicInteger(1)
+private val ids = atomic(1)
 
 /**
  * Маршрутизатор сообщений
  */
 class Router : IChannel {
 
-    val lst = ConcurrentHashMap<Int, LocalChannel>()
+    private val lst = ConcurrentHashMap<Int, LocalChannel>()
 
     class MessageBag(val instanceID: Int, val Message: Message)
 
@@ -22,11 +22,11 @@ class Router : IChannel {
 
         private var _isClosed: Boolean = false
 
-        override fun sendMessage(Data: Message) {
+        override fun sendMessage(message: Message) {
             if (_isClosed)
                 return
 
-            Router.onReceive(MessageBag(ID, Data))
+            Router.onReceive(MessageBag(ID, message))
         }
 
         fun invoke(Packet: Message) {
@@ -50,6 +50,8 @@ class Router : IChannel {
         lst.filter { it.key != pid }.values.forEach { it.invoke(pm) }
     }
 
+    override fun sendMessage(message: Message) = lst.values.forEach { it.invoke(message) }
+
     private fun removeChannel(ID: Int) {
         lst.remove(ID)
     }
@@ -64,4 +66,6 @@ class Router : IChannel {
 
         return lc
     }
+
+    override fun close() {}
 }

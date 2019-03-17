@@ -1,7 +1,8 @@
-package pvt.psk.jcore.network
+package pvt.psk.jcore.network.commands
 
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
+import pvt.psk.jcore.network.*
 import pvt.psk.jcore.utils.*
 
 fun HostInfoCommand.serialize(writer: BinaryWriter) {
@@ -24,6 +25,7 @@ fun HostInfoCommand.serialize(writer: BinaryWriter) {
 fun BinaryReader.deserialize(fromHost: HostID): Array<EndPointInfo> {
 
     // Версия упаковки
+    @Suppress("UNUSED_VARIABLE")
     val unused = readByte()
 
     val canrcvstream = readBoolean()
