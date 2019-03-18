@@ -51,30 +51,25 @@ class NetworkCommandSocket(Bus: IChannel,
         val ifcs = NetworkInterface.getNetworkInterfaces().toList().filter {
             !it.isLoopback && it.isUp && it.supportsMulticast() && !it.isPointToPoint &&
                     !it.name.contains("radio", true)
-        }.toTypedArray()
+        }.associate { Pair(it.index, it) }
 
-        ifcs.forEach {
+        ifcs.values.forEach {
             Log?.writeLog(LogImportance.Info, logCat, "Найден подходящий сетевой интерфейс $it %${it.index}")
-        }
 
-        val mcids = ifcs.map { it.index }.toIntArray()
-        mcids.forEach { z ->
             try {
-                _mcsocket.joinGroup(InetSocketAddress(mca, admPort), ifcs.find { it.index == z })
+                _mcsocket.joinGroup(InetSocketAddress(mca, admPort), it)
             } catch (e: SocketException) {
             }
         }
 
-        multicasts = mcids.map { InetSocketAddress(InetAddress.getByName("FF02::1%$it"), admPort) }.toTypedArray()
+        multicasts = ifcs.keys.map { InetSocketAddress(InetAddress.getByName("FF02::1%$it"), admPort) }.toTypedArray()
 
         val hosts = admpoints.keys.toTypedArray()
 
         admpoints.clear()
         directory.reset()
 
-        GlobalScope.launch(Dispatchers.Unconfined) {
-            hosts.forEach { resolve(it) }
-        }
+        launch { hosts.forEach { resolve(it) } }
     }
 
     override fun onBusCmd(channel: IChannelEndPoint, data: Message) {

@@ -8,15 +8,21 @@ import kotlinx.coroutines.channels.*
 import kotlinx.io.core.*
 import pvt.psk.jcore.utils.*
 import java.net.*
+import kotlin.coroutines.*
 
 @ExperimentalCoroutinesApi
 @KtorExperimentalAPI
 class SafeUdpClient(BindEndPoint: InetSocketAddress,
-                    val CancellationToken: CancellationToken,
-                    val IsMulticast: Boolean = false,
-                    private val received: suspend (ByteArray, InetSocketAddress) -> Unit) {
+                    cancellationToken: CancellationToken,
+                    isMulticast: Boolean = false,
+                    private val received: suspend (ByteArray, InetSocketAddress) -> Unit) : CoroutineScope {
 
-    private val selector = ActorSelectorManager(Dispatchers.IO)
+    private val job = SupervisorJob()
+
+    override val coroutineContext: CoroutineContext
+        get() = Dispatchers.IO + job
+
+    private val selector = ActorSelectorManager(Dispatchers.IO + job)
     private val _udp: BoundDatagramSocket
 
     val localEndPoint: InetSocketAddress
@@ -27,7 +33,7 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
         fun UDPSocketBuilder.safeBind(): BoundDatagramSocket {
             while (true) {
                 try {
-                    return bind(BindEndPoint) { reuseAddress = IsMulticast }
+                    return bind(BindEndPoint) { reuseAddress = isMulticast }
                 } catch (e: Exception) {
                     runBlocking { delay(100) }
                 }
@@ -37,12 +43,21 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
 
         _udp = aSocket(selector).udp().safeBind()
 
+        cancellationToken.getSafeToken().register {
+            // Порядок важен!
+            // Сначала завершается ожидание приема в beginReceive, затем закрывается udp
+            // иначе будет исключение в _udp.receive()
+            coroutineContext.cancelChildren()
+            runBlocking { job.cancelAndJoin() }
+            _udp.close()
+        }
+
         beginReceive()
     }
 
-    private fun beginReceive() = GlobalScope.launch(Dispatchers.IO) {
-        while (!CancellationToken.isCancellationRequested) {
-            val rp = _udp.incoming.receive()
+    private fun beginReceive() = launch {
+        while (isActive) {
+            val rp = _udp.receive()
 
             val ba = ByteArray(rp.packet.remaining.toInt())
             rp.packet.readAvailable(ba)
