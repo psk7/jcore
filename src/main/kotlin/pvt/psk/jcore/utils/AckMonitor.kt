@@ -5,11 +5,9 @@ import java.util.concurrent.*
 
 val lst = ConcurrentHashMap<AckToken, CompletableDeferred<Any>>()
 
-@ExperimentalCoroutinesApi
 fun <T> register(timeOut: Int): Pair<AckToken, Deferred<T>> =
         register(CancellationTokenSource(timeOut.toLong()).token)
 
-@ExperimentalCoroutinesApi
 fun <T> register(cancellationToken: CancellationToken): Pair<AckToken, Deferred<T>> =
         register<T>().apply {
             cancellationToken.register {
@@ -18,7 +16,6 @@ fun <T> register(cancellationToken: CancellationToken): Pair<AckToken, Deferred<
         }
 
 @Suppress("UNCHECKED_CAST")
-@ExperimentalCoroutinesApi
 fun <T> register(): Pair<AckToken, Deferred<T>> {
     val tk = AckToken()
     val cd = CompletableDeferred<Any>()

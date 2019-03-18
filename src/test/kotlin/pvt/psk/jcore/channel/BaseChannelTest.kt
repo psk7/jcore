@@ -12,7 +12,6 @@ import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.util.*
 
-@ExperimentalCoroutinesApi
 class BaseChannelTest {
 
     private class Sender : ISender {
@@ -24,23 +23,20 @@ class BaseChannelTest {
     private class EP(Data: IChannel, Sender: ISender, TargetHost: HostID) : EndPoint(Data, Sender, TargetHost) {
     }
 
-    @ExperimentalCoroutinesApi
-    private class PC(val _fromHost: HostID, ToHost: HostID) : PollCommand() {
+        private class PC(val _fromHost: HostID, ToHost: HostID) : PollCommand() {
 
         override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
             return HostInfoCommand(2, _fromHost, arrayOf(), HostID.Local)
         }
     }
 
-    @ExperimentalCoroutinesApi
-    private class PP(val Self: HostID, ControlChannel: IChannel, Logger: Logger?) :
+        private class PP(val Self: HostID, ControlChannel: IChannel, Logger: Logger?) :
             PeerProtocol(Self, ControlChannel, Logger) {
 
         override fun createPollCommand(): PollCommand = PC(Self, HostID.Local)
     }
 
-    @ExperimentalCoroutinesApi
-    class BC(Name: String, ControlBus: IChannel, Data: Router, Logger: Logger?, CancellationToken: CancellationToken) :
+        class BC(Name: String, ControlBus: IChannel, Data: Router, Logger: Logger?, CancellationToken: CancellationToken) :
             BaseChannel(Name, ControlBus, Data, Logger, CancellationToken) {
 
         init {

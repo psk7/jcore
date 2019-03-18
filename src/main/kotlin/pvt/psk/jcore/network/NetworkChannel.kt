@@ -1,7 +1,5 @@
 package pvt.psk.jcore.network
 
-import io.ktor.util.*
-import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
@@ -13,8 +11,6 @@ import java.net.*
 /**
  * Канал передачи сообщений на основе IP сетей
  */
-@KtorExperimentalAPI
-@ExperimentalCoroutinesApi
 class NetworkChannel(Name: String, ControlBus: IChannel, Data: Router,
                      HostID: HostID, private val directory: IPAddressDirectory,
                      Logger: Logger?,
@@ -30,6 +26,8 @@ class NetworkChannel(Name: String, ControlBus: IChannel, Data: Router,
         _nss = NetworkSenderSocket(HostID, CancellationToken, Logger)
 
         basePort = _nss.basePort
+
+        Logger?.writeLog(LogImportance.Info, logCat, "Создан канал передачи данных $Name. Порт $basePort")
 
         directory.set(HostID, Inet6Address.getLoopbackAddress())
 

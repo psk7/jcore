@@ -6,8 +6,6 @@ import org.junit.jupiter.api.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 
-@KtorExperimentalAPI
-@ExperimentalCoroutinesApi
 class SafeUdpClientTest {
 
     /**

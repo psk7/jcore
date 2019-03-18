@@ -6,7 +6,6 @@ import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 
-@ExperimentalCoroutinesApi
 class AckMonitorTest {
     @Test
     fun Test() = runBlocking {

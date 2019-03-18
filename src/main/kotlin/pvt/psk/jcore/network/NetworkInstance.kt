@@ -8,8 +8,6 @@ import pvt.psk.jcore.instance.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.network.commands.*
 
-@KtorExperimentalAPI
-@ExperimentalCoroutinesApi
 open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: Logger?)
     : BaseInstance(Name, DomainName, AdmPort, Log) {
 
@@ -34,7 +32,7 @@ open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: 
     /**
      * Повторное сканирование и настройка сетевых интерфейсов
      */
-    fun rescan() {
+    open fun rescan() {
         (ComSocket as? NetworkCommandSocket)?.scan()
     }
 }

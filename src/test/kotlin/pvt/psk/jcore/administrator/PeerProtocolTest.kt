@@ -15,7 +15,6 @@ import java.net.*
 import java.util.*
 import java.util.concurrent.*
 
-@ExperimentalCoroutinesApi
 private class TestPeerProtocol(selfHostID: HostID, controlChannel: IChannel, logger: Logger?) :
         PeerProtocol(selfHostID, controlChannel, logger) {
 
@@ -27,14 +26,13 @@ private class TestHostInfoCommand(SequenceID: Int, FromHost: HostID, endPoints: 
         HostInfoCommand(SequenceID, FromHost, endPoints, ToHost, *payload) {
 }
 
-@ExperimentalCoroutinesApi
 private class TestPollCommand(ToHost: HostID) : PollCommand() {
     override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
         return TestHostInfoCommand(SeqID, FromHost, arrayOf(), ToHost)
     }
 }
 
-private class MsgQueue() : LinkedBlockingQueue<Message>() {
+class MsgQueue() : LinkedBlockingQueue<Message>() {
 
     fun <T> tryGetMessage(): T where T : Message {
 
@@ -44,7 +42,6 @@ private class MsgQueue() : LinkedBlockingQueue<Message>() {
     }
 }
 
-@ExperimentalCoroutinesApi
 class PeerProtocolTest {
 
     @Test

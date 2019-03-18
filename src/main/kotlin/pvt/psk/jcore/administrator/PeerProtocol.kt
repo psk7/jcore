@@ -15,7 +15,6 @@ import kotlin.collections.HashSet
 /**
  * Протокол обмена информацией о соседних хостах
  */
-@ExperimentalCoroutinesApi
 abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, val logger: Logger?) {
 
     val logCat: String = "Peer"

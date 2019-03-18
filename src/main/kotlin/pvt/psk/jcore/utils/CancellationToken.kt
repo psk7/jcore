@@ -2,7 +2,6 @@ package pvt.psk.jcore.utils
 
 import kotlinx.coroutines.*
 
-@ExperimentalCoroutinesApi
 class CancellationToken {
 
     companion object {
@@ -32,7 +31,6 @@ class CancellationToken {
 
 }
 
-@ExperimentalCoroutinesApi
 fun CancellationToken.getSafeToken(): CancellationTokenSource {
     val cts = CancellationTokenSource()
 

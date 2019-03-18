@@ -9,7 +9,6 @@ import java.util.concurrent.*
 /**
  * Команда опроса конечных точек хоста для сбора информации о каналах
  */
-@ExperimentalCoroutinesApi
 abstract class PollCommand : Message() {
 
     protected val chans = ConcurrentHashMap<String, BaseChannel>()

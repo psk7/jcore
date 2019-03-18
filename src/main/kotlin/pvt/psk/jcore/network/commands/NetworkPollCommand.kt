@@ -7,8 +7,6 @@ import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.network.*
 
-@KtorExperimentalAPI
-@ExperimentalCoroutinesApi
 class NetworkPollCommand : PollCommand() {
 
     override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand =

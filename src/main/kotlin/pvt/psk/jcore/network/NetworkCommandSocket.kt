@@ -1,8 +1,8 @@
 package pvt.psk.jcore.network
 
-import io.ktor.util.*
 import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
+import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
@@ -12,8 +12,6 @@ import java.net.*
 import java.util.concurrent.*
 import kotlin.coroutines.*
 
-@KtorExperimentalAPI
-@ExperimentalCoroutinesApi
 class NetworkCommandSocket(Bus: IChannel,
                            val admPort: Int,
                            Log: Logger?,
@@ -21,11 +19,19 @@ class NetworkCommandSocket(Bus: IChannel,
                            private val CancellationToken: CancellationToken) :
         PeerCommandSocket(Bus, Log, CancellationToken), CoroutineScope {
 
+    private val job = SupervisorJob()
+
     override val coroutineContext: CoroutineContext
-        get() = Dispatchers.Unconfined
+        get() = Dispatchers.Unconfined + job
+
+    var admResolveTimeout = 2000L
+
+    private class Bag(var endPoint: InetSocketAddress? = null)
 
     private val unicastudp: SafeUdpClient
-    private val admpoints = ConcurrentHashMap<HostID, Deferred<InetSocketAddress?>>()
+    private val admpoints = ConcurrentHashMap<HostID, Deferred<Bag>>()
+
+    private var scanBlocked = false
 
     /**
      * Multicast сокет. Используется **только** для приема широковещательной рассылки
@@ -35,8 +41,11 @@ class NetworkCommandSocket(Bus: IChannel,
 
     private var multicasts = arrayOf<InetSocketAddress>()
 
+    val admEndPoints: Map<HostID, InetSocketAddress?>
+        get() = admpoints.mapValues { it.value.result.endPoint }
+
     init {
-        unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, ::received)
+        unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, noBind = true, received = ::received)
 
         _mcsocket = MulticastSocket(admPort)
 
@@ -45,12 +54,28 @@ class NetworkCommandSocket(Bus: IChannel,
         scan()
     }
 
+    /**
+     * Сканирование сетевых интерфейсов, пересоздание административных точек, сброс карт сетевых адресов
+     * и повторный цикл перерегистрации хостов
+     */
     fun scan() {
+        if (scanBlocked)
+            return
+
+        // Вводится блокировка повторного сканирования
+        scanBlocked = true
+
+        launch {
+            // Через 2 секунды блокировка снимается
+            delay(2000)
+
+            scanBlocked = false
+        }
+
         val mca = InetAddress.getByName("FF02::1")
 
         val ifcs = NetworkInterface.getNetworkInterfaces().toList().filter {
-            !it.isLoopback && it.isUp && it.supportsMulticast() && !it.isPointToPoint &&
-                    !it.name.contains("radio", true)
+            !it.isLoopback && it.isUp && it.supportsMulticast() && !it.isPointToPoint && !it.name.contains("radio", true)
         }.associate { Pair(it.index, it) }
 
         ifcs.values.forEach {
@@ -64,10 +89,14 @@ class NetworkCommandSocket(Bus: IChannel,
 
         multicasts = ifcs.keys.map { InetSocketAddress(InetAddress.getByName("FF02::1%$it"), admPort) }.toTypedArray()
 
+        unicastudp.bind()
+
         val hosts = admpoints.keys.toTypedArray()
 
         admpoints.clear()
         directory.reset()
+
+        bus.sendMessage(DiscoveryCommand(HostID.Local, HostID.All))
 
         launch { hosts.forEach { resolve(it) } }
     }
@@ -75,8 +104,9 @@ class NetworkCommandSocket(Bus: IChannel,
     override fun onBusCmd(channel: IChannelEndPoint, data: Message) {
         when (data) {
             is HostAdmResolved -> {
-                @Suppress("DeferredResultUnused")
-                admpoints.getOrPut(data.host) { CompletableDeferred(data.admPoint) }
+                launch {
+                    admpoints.getOrPut(data.host) { CompletableDeferred(Bag(data.admPoint)) }.await().endPoint = data.admPoint
+                }
                 directory.set(data.host, data.admPoint.address)
             }
 
@@ -94,13 +124,14 @@ class NetworkCommandSocket(Bus: IChannel,
      * @return Управляющая конечная точка хоста
      */
     private suspend fun resolve(target: HostID): InetSocketAddress? {
-        val ep = admpoints.getOrPut(target) { resolveAsync(target) }.await()
+        val bag = admpoints.getOrPut(target) { resolveAsync(target) }.await()
 
-        @Suppress("DeferredResultUnused")
-        if (ep == null)
-            admpoints.remove(target)
+        if (bag.endPoint == null) {
+            @Suppress("UNUSED_VARIABLE")
+            val unused = admpoints.remove(target)
+        }
 
-        return ep
+        return bag.endPoint
     }
 
     /**
@@ -114,10 +145,10 @@ class NetworkCommandSocket(Bus: IChannel,
      * Ожидание ограничено 1 сек. Первый же ответ становится результатом операции, а остальные отбрасываются.
      * Результат неудачного разрешения кешируется на 2 сек., а затем удаляется.
      */
-    private fun resolveAsync(target: HostID): Deferred<InetSocketAddress?> {
+    private fun resolveAsync(target: HostID): Deferred<Bag> {
         Log?.writeLog(LogImportance.Info, logCat, "Разрешение административной точки хоста $target")
 
-        val cd = CompletableDeferred<InetSocketAddress?>()
+        val cd = CompletableDeferred<Bag>()
 
         val (tk, j) = register<InetSocketAddress?>(CancellationTokenSource(1000).token)
 
@@ -126,14 +157,14 @@ class NetworkCommandSocket(Bus: IChannel,
         launch {
             val r = j.await()
 
-            if (r != null && cd.complete(r))
+            if (r != null && cd.complete(Bag(r)))
                 Log?.writeLog(LogImportance.Warning, logCat, "Административная точка хоста $target найдена по адресу $r")
         }
 
         launch {
-            delay(2000)
+            delay(admResolveTimeout)
 
-            if (cd.complete(null))
+            if (cd.complete(Bag(null)))
                 Log?.writeLog(LogImportance.Warning, logCat, "Административная точка хоста $target не найдена")
         }
 

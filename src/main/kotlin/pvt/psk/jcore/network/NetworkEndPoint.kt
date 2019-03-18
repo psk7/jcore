@@ -8,8 +8,6 @@ import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import java.net.*
 
-@ExperimentalCoroutinesApi
-@KtorExperimentalAPI
 class NetworkEndPoint(dataChannel: IChannel, sender: ISender, targetHost: HostID,
                       private val directory: IPAddressDirectory,
                       private val port: Int,

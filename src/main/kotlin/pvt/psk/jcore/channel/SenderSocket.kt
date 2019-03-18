@@ -5,7 +5,6 @@ import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import kotlin.coroutines.*
 
-@ExperimentalCoroutinesApi
 abstract class SenderSocket(cancellationToken: CancellationToken, val logger: Logger?) : CoroutineScope, ISender {
 
     val logCat: String = "SenderSocket"

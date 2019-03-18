@@ -11,8 +11,6 @@ import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.network.commands.*
 import pvt.psk.jcore.utils.*
 
-@KtorExperimentalAPI
-@ExperimentalCoroutinesApi
 class NetworkPeerProtocol(selfHostID: HostID, controlChannel: IChannel, logger: Logger?) :
         PeerProtocol(selfHostID, controlChannel, logger) {
 

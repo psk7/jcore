@@ -5,7 +5,6 @@ import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 
-@ExperimentalCoroutinesApi
 abstract class PeerCommandSocket constructor(Bus: IChannel,
                                              val Log: Logger?,
                                              @Suppress("UNUSED_PARAMETER") CancellationToken: CancellationToken) {

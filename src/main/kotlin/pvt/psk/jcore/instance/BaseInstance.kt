@@ -10,7 +10,6 @@ import java.util.*
 import java.util.concurrent.locks.*
 import kotlin.concurrent.*
 
-@ExperimentalCoroutinesApi
 abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: Int, val Log: Logger?) {
 
     val logCat: String = "Peer"

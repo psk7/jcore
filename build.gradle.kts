@@ -47,6 +47,8 @@ dependencies {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "1.8"
+    //kotlinOptions.suppressWarnings = true
+    kotlinOptions.freeCompilerArgs = listOf("-Xuse-experimental=io.ktor.util.KtorExperimentalAPI", "-Xuse-experimental=kotlinx.coroutines.ExperimentalCoroutinesApi")
 }
 
 tasks.create<JavaExec>("runcon") {

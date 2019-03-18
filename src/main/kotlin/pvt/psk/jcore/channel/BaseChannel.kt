@@ -14,7 +14,6 @@ import java.util.concurrent.*
 /**
  * Базовый класс, представляющий пользовательский канал передачи сообщений
  */
-@ExperimentalCoroutinesApi
 abstract class BaseChannel(val name: String,
                            protected val controlBus: IChannel,
                            protected val data: Router,

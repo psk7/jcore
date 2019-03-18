@@ -12,8 +12,6 @@ import java.util.concurrent.*
 /**
  * Представляет точку обмена трафиком пользовательского канала
  */
-@ExperimentalCoroutinesApi
-@KtorExperimentalAPI
 class NetworkSenderSocket(private val selfId: HostID, cancellationToken: CancellationToken, logger: Logger?) :
         SenderSocket(cancellationToken, logger) {
 
@@ -39,7 +37,7 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
     // val tcp: ServerSocket
 
     init {
-        udp = SafeUdpClient(InetSocketAddress(InetAddress.getByName("::"), 0), cancellationToken, false, ::udpReceived)
+        udp = SafeUdpClient(InetSocketAddress(InetAddress.getByName("::"), 0), cancellationToken, false, received = ::udpReceived)
 
         logger?.writeLog(LogImportance.Info, logCat, "Открыт UDP сокет по адресу ${udp.localEndPoint}")
 
