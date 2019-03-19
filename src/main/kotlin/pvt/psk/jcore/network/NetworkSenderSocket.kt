@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
+import pvt.psk.jcore.network.commands.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 import java.util.concurrent.*
@@ -12,7 +13,7 @@ import java.util.concurrent.*
 /**
  * Представляет точку обмена трафиком пользовательского канала
  */
-class NetworkSenderSocket(private val selfId: HostID, cancellationToken: CancellationToken, logger: Logger?) :
+class NetworkSenderSocket(private val selfId: HostID, controlBus: IChannel, cancellationToken: CancellationToken, logger: Logger?) :
         SenderSocket(cancellationToken, logger) {
 
     /**
@@ -41,8 +42,19 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
 
         logger?.writeLog(LogImportance.Info, logCat, "Открыт UDP сокет по адресу ${udp.localEndPoint}")
 
+        controlBus.getChannel(::onCmd);
+
         //tcp = aSocket(ActorSelectorManager(Dispatchers.IO)).tcp().bind(InetSocketAddress("::", 0))
         //launch(Dispatchers.IO) { beginAccept() } <- for stream over tcp
+    }
+
+    private fun onCmd(@Suppress("UNUSED_PARAMETER") ch: IChannelEndPoint, msg: Message) {
+        when (msg) {
+            is RebindCommand -> {
+                udp.bind()
+                logger?.writeLog(LogImportance.Info, logCat, "Rebind $udp")
+            }
+        }
     }
 
     @Suppress("unused", "RedundantSuspendModifier")
@@ -69,19 +81,20 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
      * @param bytes Принятый пакет данных
      * @param from Отправитель пакета данных
      */
-    private suspend fun udpReceived(bytes: ByteArray, from: InetSocketAddress) {
+    private fun udpReceived(bytes: ByteArray, from: InetSocketAddress) {
+        launch {
+            val rd = BinaryReader(bytes)
 
-        val rd = BinaryReader(bytes)
+            val b = rd.readByte()
 
-        val b = rd.readByte()
+            val pid = PacketID.values().find { it.id == b.toInt() }
 
-        val pid = PacketID.values().find { it.id == b.toInt() }
-
-        when (pid) {
-            PacketID.Datagram -> receiveDatagram(rd, from)
-            PacketID.Ping -> ping(rd, from)
-            PacketID.PingReply -> pingReply(rd, from)
-            else -> {
+            when (pid) {
+                PacketID.Datagram -> receiveDatagram(rd, from)
+                PacketID.Ping -> ping(rd, from)
+                PacketID.PingReply -> pingReply(rd, from)
+                else -> {
+                }
             }
         }
     }
@@ -94,6 +107,8 @@ class NetworkSenderSocket(private val selfId: HostID, cancellationToken: Cancell
     private fun ping(reader: BinaryReader, from: InetSocketAddress) {
         val tk = AckToken(reader)
         val wr = BinaryWriter()
+
+        logger?.writeLog(LogImportance.Trace, logCat, "Ping from $from, token $tk")
 
         wr.write(PacketID.PingReply.id.toByte())
         wr.write(tk)

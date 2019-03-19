@@ -23,7 +23,7 @@ class NetworkChannel(Name: String, ControlBus: IChannel, Data: Router,
     val basePort: Int
 
     init {
-        _nss = NetworkSenderSocket(HostID, CancellationToken, Logger)
+        _nss = NetworkSenderSocket(HostID, ControlBus, CancellationToken, Logger)
 
         basePort = _nss.basePort
 

@@ -34,5 +34,7 @@ open class NetworkInstance(Name: String, DomainName: String, AdmPort: Int, Log: 
      */
     open fun rescan() {
         (ComSocket as? NetworkCommandSocket)?.scan()
+
+        controlBus.sendMessage(RebindCommand())
     }
 }

@@ -13,8 +13,7 @@ import kotlin.coroutines.*
 class SafeUdpClient(BindEndPoint: InetSocketAddress,
                     cancellationToken: CancellationToken,
                     private val isMulticast: Boolean = false,
-                    private val noBind: Boolean = false,
-                    private val received: suspend (ByteArray, InetSocketAddress) -> Unit) : CoroutineScope {
+                    private val received: (ByteArray, InetSocketAddress) -> Unit) : CoroutineScope {
 
     private val job = SupervisorJob()
 
@@ -29,17 +28,9 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
         get() = (_udp?.localAddress as InetSocketAddress)
 
     init {
-        if (!noBind)
-            bind()
+        bind()
 
-        cancellationToken.getSafeToken().register {
-            // Порядок важен!
-            // Сначала завершается ожидание приема в beginReceive, затем закрывается udp
-            // иначе будет исключение в _udp.receive()
-            coroutineContext.cancelChildren()
-            runBlocking { job.cancelAndJoin() }
-            _udp?.close()
-        }
+        cancellationToken.getSafeToken().register(::close)
     }
 
     fun bind() {
@@ -76,7 +67,7 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
                 rp.packet.readAvailable(ba)
 
                 launch { received(ba, rp.address as InetSocketAddress) }
-            } catch (e: Exception) {
+            } catch (e: ClosedReceiveChannelException) {
                 break
             }
         }
@@ -87,4 +78,15 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
                 _udp!!.outgoing.sendBlocking(Datagram(ByteReadPacket(data), target))
             } catch (e: Exception) {
             }
+
+    fun close() {
+        // Порядок важен!
+        // Сначала завершается ожидание приема в beginReceive, затем закрывается udp
+        // иначе будет исключение в _udp.receive()
+        coroutineContext.cancelChildren()
+        runBlocking { job.cancelAndJoin() }
+        socketExceptionSafe { _udp?.close() }
+    }
+
+    override fun toString(): String = "UDP: ${_udp?.localAddress}"
 }

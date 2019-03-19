@@ -1,6 +1,7 @@
 package pvt.psk.jcore.network
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
@@ -11,6 +12,13 @@ import pvt.psk.jcore.utils.*
 import java.net.*
 import java.util.concurrent.*
 import kotlin.coroutines.*
+
+fun socketExceptionSafe(block: () -> Unit) {
+    try {
+        block()
+    } catch (e: SocketException) {
+    }
+}
 
 class NetworkCommandSocket(Bus: IChannel,
                            val admPort: Int,
@@ -28,10 +36,11 @@ class NetworkCommandSocket(Bus: IChannel,
 
     private class Bag(var endPoint: InetSocketAddress? = null)
 
-    private val unicastudp: SafeUdpClient
+    //private val unicastudp: SafeUdpClient
     private val admpoints = ConcurrentHashMap<HostID, Deferred<Bag>>()
 
     private var scanBlocked = false
+    private val scanLock = Mutex()
 
     /**
      * Multicast сокет. Используется **только** для приема широковещательной рассылки
@@ -39,17 +48,18 @@ class NetworkCommandSocket(Bus: IChannel,
      */
     private val _mcsocket: MulticastSocket
 
-    private var multicasts = arrayOf<InetSocketAddress>()
+    private var multicasts = arrayOf<Pair<InetSocketAddress, SafeUdpClient>>()
+    private var multisocks: Map<Int, SafeUdpClient>? = null
 
     val admEndPoints: Map<HostID, InetSocketAddress?>
         get() = admpoints.mapValues { it.value.result.endPoint }
 
     init {
-        unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, noBind = true, received = ::received)
+        //unicastudp = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, noBind = true, received = ::received)
 
         _mcsocket = MulticastSocket(admPort)
 
-        beginReceive()
+        beginReceiveMulticast()
 
         scan()
     }
@@ -72,33 +82,50 @@ class NetworkCommandSocket(Bus: IChannel,
             scanBlocked = false
         }
 
+        launch {
+            scanLock.lock()
+
+            try {
+                scanSync()
+            } finally {
+                scanLock.unlock()
+            }
+        }
+    }
+
+    fun scanSync() {
+
+        // Закрываем все ранее открытые командные сокеты
+        multicasts.forEach { p -> p.second.close() }
+
         val mca = InetAddress.getByName("FF02::1")
 
         val ifcs = NetworkInterface.getNetworkInterfaces().toList().filter {
             !it.isLoopback && it.isUp && it.supportsMulticast() && !it.isPointToPoint && !it.name.contains("radio", true)
+                    && !it.name.contains("p2p", true)
         }.associate { Pair(it.index, it) }
 
-        ifcs.values.forEach {
+        val m = ifcs.values.map {
             Log?.writeLog(LogImportance.Info, logCat, "Найден подходящий сетевой интерфейс $it %${it.index}")
 
-            try {
-                _mcsocket.joinGroup(InetSocketAddress(mca, admPort), it)
-            } catch (e: SocketException) {
-            }
+            // Добавляем широковещательный сокет во multicast группы на всех интерфейсах
+            socketExceptionSafe { _mcsocket.joinGroup(InetSocketAddress(mca, admPort), it) }
+
+            val u = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, received = ::received)
+
+            Pair(InetSocketAddress(InetAddress.getByName("FF02::1%${it.index}"), admPort), u)
         }
 
-        multicasts = ifcs.keys.map { InetSocketAddress(InetAddress.getByName("FF02::1%$it"), admPort) }.toTypedArray()
-
-        unicastudp.bind()
-
-        val hosts = admpoints.keys.toTypedArray()
+        multicasts = m.toTypedArray()
+        multisocks = m.associateBy({ (it.first.address as Inet6Address).scopeId }, { it.second })
 
         admpoints.clear()
         directory.reset()
 
-        bus.sendMessage(DiscoveryCommand(HostID.Local, HostID.All))
-
-        launch { hosts.forEach { resolve(it) } }
+        launch {
+            delay(1000)
+            bus.sendMessage(DiscoveryCommand(HostID.Local, HostID.All))
+        }
     }
 
     override fun onBusCmd(channel: IChannelEndPoint, data: Message) {
@@ -129,6 +156,8 @@ class NetworkCommandSocket(Bus: IChannel,
         if (bag.endPoint == null) {
             @Suppress("UNUSED_VARIABLE")
             val unused = admpoints.remove(target)
+
+            Log?.writeLog(LogImportance.Error, logCat, "Разрешение не удалось команда хосту $target будет потеряна")
         }
 
         return bag.endPoint
@@ -171,7 +200,7 @@ class NetworkCommandSocket(Bus: IChannel,
         return cd
     }
 
-    override fun beginReceive() {
+    fun beginReceiveMulticast() {
         GlobalScope.launch(Dispatchers.IO) {
             val buf = ByteArray(16384)
 
@@ -193,8 +222,7 @@ class NetworkCommandSocket(Bus: IChannel,
         }
     }
 
-    @Suppress("RedundantSuspendModifier")
-    private suspend fun received(data: ByteArray, from: InetSocketAddress) {
+    private fun received(data: ByteArray, from: InetSocketAddress) {
 
         if (data.count() == 0)
             return
@@ -207,24 +235,20 @@ class NetworkCommandSocket(Bus: IChannel,
         val d = command.data
         val tgt = command.toHost
 
-        fun send(send: InetSocketAddress?) {
-            if (send == null)
-                return
+        fun send(send: InetSocketAddress, udp: SafeUdpClient? = null) {
+            val u = udp ?: multisocks?.get((send.address as Inet6Address).scopeId) ?: return
 
             Log?.writeLog(LogImportance.Trace, logCat, "Отправка команды по адресу $send")
 
-            unicastudp.send(d, send)
+            u.send(d, send)
         }
 
         if (command.toEndPoint != null)
             send(command.toEndPoint)
         else if (tgt.isBroadcast || command.isBroadcast)
-            multicasts.forEach(::send)
+            multicasts.forEach { send(it.first, it.second) }
         else {
-            launch {
-                val target = resolve(tgt) ?: return@launch
-                send(target)
-            }
+            launch { send(resolve(tgt) ?: return@launch) }
         }
     }
 }

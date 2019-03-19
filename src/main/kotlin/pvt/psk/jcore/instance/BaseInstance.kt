@@ -32,8 +32,6 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
         PeerProto = createPeerProtocol(controlBus, DomainName)
 
         ComSocket = createPeerCommandSocket()
-
-        PeerProto!!.discovery()
     }
 
     fun joinChannel(channelName: String): BaseChannel =

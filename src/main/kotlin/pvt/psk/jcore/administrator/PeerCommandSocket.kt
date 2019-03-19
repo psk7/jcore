@@ -25,5 +25,5 @@ abstract class PeerCommandSocket constructor(Bus: IChannel,
         bus.sendMessage(Message)
     }
 
-    abstract fun beginReceive()
+    //abstract fun beginReceive()
 }
