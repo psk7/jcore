@@ -161,7 +161,7 @@ abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, va
                 hd = HostData(command.sequenceID)
                 hosts[command.fromHost] = hd
             } else if (command.sequenceID <= hd!!.lastSequenceID) {
-                logger?.writeLog(LogImportance.Info, logCat,
+                logger?.writeLog(LogImportance.Trace, logCat,
                                  "Команда $command проигнорирована из-за значения SeqID=${command.sequenceID} <= ${hd.lastSequenceID}")
                 return false
             }

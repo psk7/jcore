@@ -93,7 +93,7 @@ class NetworkCommandSocket(Bus: IChannel,
         }
     }
 
-    fun scanSync() {
+    private fun scanSync() {
 
         // Закрываем все ранее открытые командные сокеты
         multicasts.forEach { p -> p.second.close() }
@@ -117,7 +117,7 @@ class NetworkCommandSocket(Bus: IChannel,
         }
 
         multicasts = m.toTypedArray()
-        multisocks = m.associateBy({ (it.first.address as Inet6Address).scopeId }, { it.second })
+        multisocks = m.associateBy({ (a, _) -> (a.address as Inet6Address).scopeId }, { (_, u) -> u })
 
         admpoints.clear()
         directory.reset()
@@ -200,7 +200,7 @@ class NetworkCommandSocket(Bus: IChannel,
         return cd
     }
 
-    fun beginReceiveMulticast() {
+    private fun beginReceiveMulticast() {
         GlobalScope.launch(Dispatchers.IO) {
             val buf = ByteArray(16384)
 
@@ -217,7 +217,7 @@ class NetworkCommandSocket(Bus: IChannel,
                 val ba = ByteArray(l)
                 dp.data.copyInto(ba, endIndex = l)
 
-                launch { received(ba, dp.socketAddress as InetSocketAddress) }
+                GlobalScope.launch(Dispatchers.IO) { received(ba, dp.socketAddress as InetSocketAddress) }
             }
         }
     }
@@ -246,7 +246,7 @@ class NetworkCommandSocket(Bus: IChannel,
         if (command.toEndPoint != null)
             send(command.toEndPoint)
         else if (tgt.isBroadcast || command.isBroadcast)
-            multicasts.forEach { send(it.first, it.second) }
+            multicasts.forEach { (a, u) -> send(a, u) }
         else {
             launch { send(resolve(tgt) ?: return@launch) }
         }

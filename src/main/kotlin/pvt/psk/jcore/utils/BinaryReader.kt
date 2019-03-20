@@ -51,4 +51,6 @@ class BinaryReader {
     fun readBoolean(): Boolean = readByte() != 0.toByte()
 
     fun readLong(): Long = ByteBuffer.wrap(readBytes(Long.SIZE_BYTES)).order(ByteOrder.LITTLE_ENDIAN).long
+
+    fun readDouble(): Double = Double.fromBits(readLong())
 }
