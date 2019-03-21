@@ -1,17 +1,18 @@
+@file:Suppress("unused", "UNUSED_PARAMETER", "MemberVisibilityCanBePrivate")
+
 package pvt.psk.jcore.channel
 
 import pvt.psk.jcore.host.*
 
-abstract class EndPoint(@Suppress("CanBeParameter") private val dataChannel: IChannel?,
-                        @Suppress("MemberVisibilityCanBePrivate") protected val sender: ISender, val targetHost: HostID,
-                        @Suppress("unused") val canReceiveStream: Boolean = false) {
+abstract class EndPoint(dataChannel: IChannel?,
+                        private val sender: ISender, val targetHost: HostID,
+                        val canReceiveStream: Boolean = false) {
 
-    protected val Data = dataChannel?.getChannel(::send)
+    protected val data = dataChannel?.getChannel(::send)
 
     private var isClosed = false
 
-    @Suppress("MemberVisibilityCanBePrivate")
-    fun send(@Suppress("UNUSED_PARAMETER") channel: IChannelEndPoint, message: Message) {
+    fun send(channel: IChannelEndPoint, message: Message) {
         if (isClosed)
             return
 
@@ -19,11 +20,11 @@ abstract class EndPoint(@Suppress("CanBeParameter") private val dataChannel: ICh
             sender.send(message, this)
     }
 
-    open fun onReceived(message: Message) = Data?.sendMessage(message)
+    open fun onReceived(message: Message) = data?.sendMessage(message)
 
     open fun close() {
         isClosed = true
 
-        Data?.close()
+        data?.close()
     }
 }

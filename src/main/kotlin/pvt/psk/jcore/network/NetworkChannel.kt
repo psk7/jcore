@@ -34,31 +34,20 @@ class NetworkChannel(Name: String, ControlBus: IChannel, Data: Router,
         initComplete()
     }
 
-    override fun onHostRemove(host: EndPoint) {
-        host.close()
-    }
-
     override fun onHostUpdate(endPointInfo: EndPointInfo, endPoint: EndPoint) {
         //val ha = InetSocketAddress(directory.resolve(endPointInfo.target) ?: throw Exception(), endPointInfo.port)
 
         if (endPoint !is NetworkEndPoint)
             return
 
-        endPoint.isReadOnly = endPointInfo.readOnly
+        endPoint.dontSendTo = endPointInfo.dontSendTo
     }
 
-    override fun onHostCreate(endPointInfo: EndPointInfo): EndPoint {
-
-        val ipe = InetSocketAddress(directory.resolve(endPointInfo.target) ?: throw Exception(), endPointInfo.port)
-
-        val hid = endPointInfo.target
-
-        val ep = NetworkEndPoint(data, _nss, hid, directory, ipe.port, controlBus, true, endPointInfo.canReceiveStream)
-
-        logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $ep в канале $name")
-
-        return ep
-    }
+    override fun onHostCreate(endPointInfo: EndPointInfo): EndPoint =
+            NetworkEndPoint(data, _nss, endPointInfo.target, directory, endPointInfo.port,
+                            endPointInfo.dontSendTo, endPointInfo.canReceiveStream).also {
+                logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $it в канале $name")
+            }
 
     override fun processPollCommand(command: PollCommand) {
         command.registerChannel(name, this)

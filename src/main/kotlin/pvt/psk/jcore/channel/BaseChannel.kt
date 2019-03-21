@@ -55,7 +55,6 @@ abstract class BaseChannel(val name: String,
         cbEp.close()
     }
 
-    protected abstract fun onHostRemove(host: EndPoint)
     protected abstract fun onHostUpdate(endPointInfo: EndPointInfo, endPoint: EndPoint)
 
     protected abstract fun onHostCreate(endPointInfo: EndPointInfo): EndPoint
@@ -67,12 +66,8 @@ abstract class BaseChannel(val name: String,
 
         when (m) {
             is NewHostInChannelCommand -> newHostInChannel(m)
-            is UpdateHostInChannelCommand -> {
-                val v = _l[m.endPointInfo.target]
-                if (v != null)
-                    onHostUpdate(m.endPointInfo, v)
-            }
-            //is HostInfoCommand -> processHostInfo(m)
+            is HostLeaveChannelCommand -> leaveHostInChannel(m)
+            is UpdateHostInChannelCommand -> updateHostInChannel(m)
             is PollCommand -> processPollCommand(m)
         }
     }
@@ -92,5 +87,25 @@ abstract class BaseChannel(val name: String,
 
             data.sendMessage(command)
         }
+    }
+
+    private fun updateHostInChannel(command: UpdateHostInChannelCommand) {
+        if (command.endPointInfo.channelName != name)
+            return    // Чужие команды не обрабатываем
+
+        val v = _l[command.endPointInfo.target] ?: return
+
+        logger?.writeLog(LogImportance.Trace, logCat, "Обновлена информация о хосте ${command.endPointInfo.target} в канале $name")
+
+        onHostUpdate(command.endPointInfo, v)
+    }
+
+    private fun leaveHostInChannel(command: HostLeaveChannelCommand) {
+        if (command.channel != name)
+            return   // Чужие команды не обрабатываем
+
+        logger?.writeLog(LogImportance.Info, logCat, "Хост ${command.leavedHost} удален из канала $name")
+
+        _l.remove(command.leavedHost)?.close()
     }
 }

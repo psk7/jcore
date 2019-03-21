@@ -2,7 +2,6 @@ package pvt.psk.jcore.network
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
-import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.io.core.*
@@ -13,6 +12,7 @@ import kotlin.coroutines.*
 class SafeUdpClient(BindEndPoint: InetSocketAddress,
                     cancellationToken: CancellationToken,
                     private val isMulticast: Boolean = false,
+                    private val sendMultiplicator: Int = 1,
                     private val received: (ByteArray, InetSocketAddress) -> Unit) : CoroutineScope {
 
     private val job = SupervisorJob()
@@ -73,11 +73,31 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
         }
     }
 
-    fun send(data: ByteArray, target: SocketAddress): Unit =
-            try {
-                _udp!!.outgoing.sendBlocking(Datagram(ByteReadPacket(data), target))
-            } catch (e: Exception) {
-            }
+    /**
+     * Отправляет пакет в сеть
+     *
+     * @param data датаграмма
+     * @param target сетевой адрес назначения
+     */
+    fun send(data: ByteArray, target: SocketAddress) {
+        for (i in 1..sendMultiplicator)
+            sendSafe(data, target)
+    }
+
+    /**
+     * Отправляет пакет в сеть.
+     *
+     * Исключения игнорируются.
+     *
+     * @param data датаграмма
+     * @param target сетевой адрес назначения
+     */
+    private fun sendSafe(data: ByteArray, target: SocketAddress) {
+        try {
+            _udp!!.outgoing.sendBlocking(Datagram(ByteReadPacket(data), target))
+        } catch (e: Exception) {
+        }
+    }
 
     fun close() {
         // Порядок важен!

@@ -1,6 +1,5 @@
 package pvt.psk.jcore.instance
 
-import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
@@ -40,6 +39,16 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
             }.also {
                 PeerProto!!.sendHostInfo(HostID.All)
             }
+
+    fun leaveAllChannels() {
+        chanLock.write {
+            channels.values.forEach { it.close() }
+
+            channels.clear()
+        }
+
+        PeerProto?.sendHostInfo(HostID.All)
+    }
 
     open fun close() {
         cancellationSource.cancel()

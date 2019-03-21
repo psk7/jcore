@@ -2,7 +2,6 @@
 
 package pvt.psk.jcore.channel
 
-import kotlinx.coroutines.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import pvt.psk.jcore.administrator.*
@@ -45,11 +44,7 @@ class BaseChannelTest {
 
         override fun processPollCommand(command: PollCommand) {}
 
-        override fun onHostRemove(host: EndPoint) {
-            throw Exception()
-        }
-
-        override fun onHostUpdate(endPointInfo: EndPointInfo, endPoint: EndPoint) {
+            override fun onHostUpdate(endPointInfo: EndPointInfo, endPoint: EndPoint) {
             throw Exception()
         }
 

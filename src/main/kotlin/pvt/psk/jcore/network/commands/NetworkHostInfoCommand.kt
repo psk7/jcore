@@ -18,7 +18,7 @@ fun HostInfoCommand.serialize(writer: BinaryWriter) {
         e.run {
             writer.write(channelName)
             writer.write(port)
-            writer.write(readOnly)
+            writer.write(dontSendTo)
         }
 }
 

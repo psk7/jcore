@@ -21,7 +21,7 @@ fun socketExceptionSafe(block: () -> Unit) {
 }
 
 class NetworkCommandSocket(Bus: IChannel,
-                           val admPort: Int,
+                           private val admPort: Int,
                            Log: Logger?,
                            private val directory: IPAddressDirectory,
                            private val CancellationToken: CancellationToken) :
@@ -62,6 +62,9 @@ class NetworkCommandSocket(Bus: IChannel,
         beginReceiveMulticast()
 
         scan()
+
+        // После начального сканирования снимаем блокировку немедленно
+        scanBlocked = false
     }
 
     /**
@@ -96,7 +99,7 @@ class NetworkCommandSocket(Bus: IChannel,
     private fun scanSync() {
 
         // Закрываем все ранее открытые командные сокеты
-        multicasts.forEach { p -> p.second.close() }
+        multicasts.forEach { p -> socketExceptionSafe { p.second.close() } }
 
         val mca = InetAddress.getByName("FF02::1")
 
@@ -111,7 +114,9 @@ class NetworkCommandSocket(Bus: IChannel,
             // Добавляем широковещательный сокет во multicast группы на всех интерфейсах
             socketExceptionSafe { _mcsocket.joinGroup(InetSocketAddress(mca, admPort), it) }
 
-            val u = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, received = ::received)
+            val mp = if (it.name.contains("wifi", true)) 3 else 1       // Мультпликатор отправки
+
+            val u = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, mp, received = ::received)
 
             Pair(InetSocketAddress(InetAddress.getByName("FF02::1%${it.index}"), admPort), u)
         }
