@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "pvt.psk"
-version = "0.1-SNAPSHOT"
+version = "1.0"
 
 repositories {
     mavenCentral()
@@ -19,7 +19,7 @@ repositories {
 tasks.named<Upload>("uploadArchives") {
     repositories.withGroovyBuilder {
         "mavenDeployer" {
-            "repository"("url" to "file://localhost/etc/tmp/myRepo/")
+            "repository"("url" to "file:build/m2")
         }
     }
 }
