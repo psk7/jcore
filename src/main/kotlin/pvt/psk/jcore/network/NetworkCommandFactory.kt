@@ -1,5 +1,6 @@
 package pvt.psk.jcore.network
 
+import kotlinx.atomicfu.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
@@ -12,6 +13,7 @@ class NetworkCommandFactory(private val self: HostID,
                             Bus: IChannel) {
 
     private val ep: IChannelEndPoint
+    private val curseqid = atomic(1)
 
     init {
         ep = Bus.getChannel(::onReceived)
@@ -68,15 +70,12 @@ class NetworkCommandFactory(private val self: HostID,
 
         wr.write(command.CommandID.ordinal.toByte())
         wr.write(domain)
+        wr.write(curseqid.incrementAndGet())
         wr.write(fh)
         wr.write(th)
 
         when (command) {
-            is HostInfoCommand -> {
-                wr.write(command.sequenceID)
-                command.serialize(wr)
-            }
-
+            is HostInfoCommand -> command.serialize(wr)
             is PingCommand -> wr.write(command.token)
             is PingReplyCommand -> wr.write(command.token)
         }
@@ -92,10 +91,12 @@ class NetworkCommandFactory(private val self: HostID,
     private fun create(reader: BinaryReader, from: InetSocketAddress): PeerCommand? {
         val id = CommandID.values()[reader.readByte().toInt()]
 
-        val dom = reader.ReadString()
+        val dom = reader.readString()
 
         if (dom != domain)
             return null
+
+        val seq = reader.readInt32()
 
         val fromHost = HostID(reader)
         var toHost = HostID(reader)
@@ -107,17 +108,17 @@ class NetworkCommandFactory(private val self: HostID,
 
         toHost = r.second
 
-        return when (id) {
+        val c: PeerCommand = when (id) {
             CommandID.Discovery -> DiscoveryCommand(fromHost, toHost)
-            CommandID.HostInfo -> {
-                val seq = reader.readInt32()
-                HostInfoCommand(seq, fromHost, reader.deserialize(fromHost), toHost)
-            }
-
+            CommandID.HostInfo -> HostInfoCommand(fromHost, reader.deserialize(fromHost), toHost)
             CommandID.Ping -> NetworkPingCommand(fromHost, toHost, AckToken(reader), from)
             CommandID.PingReply -> NetworkPingReplyCommand(fromHost, toHost, AckToken(reader), from)
             else -> throw Exception()
         }
+
+        c.sequence = seq
+
+        return c
     }
 
     fun adjustTargetHost(from: HostID, to: HostID): Pair<Boolean, HostID> {

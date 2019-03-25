@@ -1,6 +1,6 @@
-package pvt.psk.jcore.utils
+@file:Suppress("EnumEntryName")
 
-import java.lang.Exception
+package pvt.psk.jcore.utils
 
 class Formatter {
 
@@ -44,6 +44,24 @@ class Formatter {
         }
     }
 
+    fun serialize(wr: BinaryWriter, obj: Array<String>?) {
+        if (obj == null) {
+            wr.write(Types.Null.ordinal.toByte())
+            return
+        }
+
+        wr.write(Types.StringArray.ordinal.toByte())
+        wr.write(obj.size.toShort())
+        obj.forEach {
+            val isn = true //it != null
+
+            wr.write(isn)
+
+            if (isn)
+                wr.write(it)
+        }
+    }
+
     fun deserialize(reader: BinaryReader): Any? {
 
         val id = Types.values()[reader.readByte().toInt()]
@@ -51,8 +69,10 @@ class Formatter {
         return when (id) {
             Types.Null -> null
 
-            Types.BytesArray ->{
-                reader.readBytes(reader.readInt32())
+            Types.BytesArray -> reader.readBytes(reader.readInt32())
+
+            Types.StringArray -> Array(reader.readInt16().toInt()) {
+                if (reader.readBoolean()) reader.readString() else null
             }
 
             else -> TODO("BAD ARG $id")

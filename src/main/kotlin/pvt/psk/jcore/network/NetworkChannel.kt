@@ -40,12 +40,12 @@ class NetworkChannel(Name: String, ControlBus: IChannel, Data: Router,
         if (endPoint !is NetworkEndPoint)
             return
 
-        endPoint.dontSendTo = endPointInfo.dontSendTo
+        //endPoint.dontSendTo = endPointInfo.dontSendTo
     }
 
     override fun onHostCreate(endPointInfo: EndPointInfo): EndPoint =
             NetworkEndPoint(data, _nss, endPointInfo.target, directory, endPointInfo.port,
-                            endPointInfo.dontSendTo, endPointInfo.canReceiveStream).also {
+                            endPointInfo.acceptTags, endPointInfo.canReceiveStream).also {
                 logger?.writeLog(LogImportance.Info, logCat, "Создана конечная точка $it в канале $name")
             }
 

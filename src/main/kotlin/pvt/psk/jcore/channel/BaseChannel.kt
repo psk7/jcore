@@ -10,6 +10,8 @@ import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.util.concurrent.*
+import java.util.concurrent.locks.*
+import kotlin.concurrent.*
 
 /**
  * Базовый класс, представляющий пользовательский канал передачи сообщений
@@ -18,15 +20,17 @@ abstract class BaseChannel(val name: String,
                            protected val controlBus: IChannel,
                            protected val data: Router,
                            protected val logger: Logger?,
-                           cancellationToken: CancellationToken) {
+                           cancellationToken: CancellationToken) : IChannel {
 
     protected val logCat = "BaseChannel"
 
     private lateinit var cbEp: IChannelEndPoint
 
     private val _l = ConcurrentHashMap<HostID, EndPoint>()
-
     private val cts: CancellationTokenSource
+
+    private val lock = ReentrantReadWriteLock()
+    private var _acceptabletags = arrayOf<String>()
 
     protected val cancToken: CancellationToken
 
@@ -43,11 +47,28 @@ abstract class BaseChannel(val name: String,
         cbEp = controlBus.getChannel(::controlReceived)
     }
 
-    fun getChannel(description: String? = null, received: DataReceived? = null): IChannelEndPoint = data.getChannel(received, description)
+    override fun getChannel(received: DataReceived?, description: String?): IChannelEndPoint = getChannel(null, null, received)
+
+    fun getChannel(acceptTag: String? = null, description: String? = null, received: DataReceived? = null): IChannelEndPoint {
+        if (acceptTag != null) {
+            addAcceptTag(acceptTag)
+            controlBus.sendMessage(ChannelChangedCommand())
+        }
+        else
+            return data.getChannel(received, description)
+
+        return data.getChannel(
+                { p, m ->
+                    if ((m as? DataPacket)?.tags?.contains(acceptTag) == true)
+                        received?.invoke(p, m)
+                }, description)
+    }
+
+    override fun sendMessage(message: Message) = data.sendMessage(message)
 
     protected abstract fun processPollCommand(command: PollCommand)
 
-    fun close() {
+    override fun close() {
         //_cts.Cancel()
 
         logger?.writeLog(LogImportance.Info, logCat, "Канал $name закрывается")
@@ -108,4 +129,13 @@ abstract class BaseChannel(val name: String,
 
         _l.remove(command.leavedHost)?.close()
     }
+
+    fun addAcceptTag(tag: String) {
+        lock.write {
+            _acceptabletags = _acceptabletags.plus(tag)
+        }
+    }
+
+    val acceptTags: Array<String>
+        get() = lock.read { _acceptabletags }
 }

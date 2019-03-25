@@ -9,8 +9,8 @@ import pvt.psk.jcore.network.*
 
 class NetworkPollCommand : PollCommand() {
 
-    override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand =
-            HostInfoCommand(SeqID, FromHost, chans.map {
-                create(it.key, (it.value as NetworkChannel).basePort, false, FromHost, true)
+    override fun createHostInfoCommand(FromHost: HostID, ToHost: HostID): HostInfoCommand =
+            HostInfoCommand(FromHost, chans.map {
+                create(it.key, (it.value as NetworkChannel).basePort, it.value.acceptTags, FromHost, true)
             }.toTypedArray(), ToHost)
 }

@@ -3,8 +3,8 @@ package pvt.psk.jcore.network
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.host.*
 
-fun create(channelName: String, port: Int, dontSendTo: Boolean, target: HostID, canReceiveStream: Boolean) =
-    EndPointInfo(target, channelName, dontSendTo, port, canReceiveStream)
+fun create(channelName: String, port: Int, acceptTags:Array<String>, target: HostID, canReceiveStream: Boolean) =
+    EndPointInfo(target, channelName, acceptTags, port, canReceiveStream)
 
 val EndPointInfo.port: Int
     get() = get(0) as Int

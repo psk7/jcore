@@ -35,7 +35,7 @@ class HostID {
 
     constructor(Reader: BinaryReader) {
         ID = Reader.readUUID()
-        name = Reader.ReadString()
+        name = Reader.readString()
     }
 
     companion object {

@@ -29,9 +29,10 @@ class BinaryWriter {
     fun write(byte: Byte) = baseStream.write(byteArrayOf(byte))
 
     fun write(string: String) {
-        write7BitEncodedInt(string.length)
+        val bytes = string.toByteArray(Charsets.UTF_8)
 
-        string.forEach { write(it.toByte()) }
+        write7BitEncodedInt(bytes.size)
+        write(bytes)
     }
 
     fun write(v: Int) = write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array())

@@ -14,18 +14,18 @@ import java.util.*
 class BaseChannelTest {
 
     private class Sender : ISender {
-        override fun send(Packet: DataPacket, Target: EndPoint) {
+        override fun send(packet: DataPacket, target: EndPoint) {
             TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
         }
     }
 
-    private class EP(Data: IChannel, Sender: ISender, TargetHost: HostID) : EndPoint(Data, Sender, TargetHost) {
+    private class EP(Data: IChannel, Sender: ISender, TargetHost: HostID) : EndPoint(Data, Sender, TargetHost, null) {
     }
 
         private class PC(val _fromHost: HostID, ToHost: HostID) : PollCommand() {
 
-        override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
-            return HostInfoCommand(2, _fromHost, arrayOf(), HostID.Local)
+        override fun createHostInfoCommand(FromHost: HostID, ToHost: HostID): HostInfoCommand {
+            return HostInfoCommand(_fromHost, arrayOf(), HostID.Local)
         }
     }
 
@@ -66,7 +66,7 @@ class BaseChannelTest {
 
         val cc = cr.getChannel()
 
-        val hi = HostInfoCommand(1, rh, arrayOf(EndPointInfo(rh, "Channel", false)), HostID.Local)
+        val hi = HostInfoCommand(rh, arrayOf(EndPointInfo(rh, "Channel", arrayOf())), HostID.Local)
 
         var newhost = HostID.All
 

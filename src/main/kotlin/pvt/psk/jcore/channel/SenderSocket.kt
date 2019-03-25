@@ -19,13 +19,13 @@ abstract class SenderSocket(cancellationToken: CancellationToken, val logger: Lo
     /**
      * Отправка сообщения адресату
      */
-    override fun send(Packet: DataPacket, Target: EndPoint) {
+    override fun send(packet: DataPacket, target: EndPoint) {
 
-        if (!Packet.toHost.isNetwork)
+        if (!packet.toHost.isNetwork)
             return
 
-        when (Packet) {
-            is BytesPacket -> sendDatagram(Packet, Target)
+        when (packet) {
+            is BytesPacket -> sendDatagram(packet, target)
         }
     }
 

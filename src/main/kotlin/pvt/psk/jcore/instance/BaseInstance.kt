@@ -2,6 +2,7 @@ package pvt.psk.jcore.instance
 
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.channel.*
+import pvt.psk.jcore.channel.commands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
@@ -24,6 +25,7 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
 
     private val chanLock = ReentrantReadWriteLock()
     private val channels = Hashtable<String, BaseChannel>()
+    private val cb = controlBus.getChannel(::onCommand)
 
     open fun init() {
         Log?.writeLog(LogImportance.Info, logCat, "Создан экземпляр $selfHostID")
@@ -31,6 +33,12 @@ abstract class BaseInstance(Name: String, val DomainName: String, val AdmPort: I
         PeerProto = createPeerProtocol(controlBus, DomainName)
 
         ComSocket = createPeerCommandSocket()
+    }
+
+    private fun onCommand(@Suppress("UNUSED_PARAMETER") channel: IChannelEndPoint, msg: Message) {
+        when (msg) {
+            is ChannelChangedCommand -> PeerProto?.sendHostInfo(HostID.All)
+        }
     }
 
     fun joinChannel(channelName: String): BaseChannel =

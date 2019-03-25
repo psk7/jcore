@@ -16,7 +16,7 @@ abstract class PollCommand : Message() {
     val channels
         get() = chans.map { Pair(it.key, it.value) }.toTypedArray()
 
-    abstract fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand
+    abstract fun createHostInfoCommand(FromHost: HostID, ToHost: HostID): HostInfoCommand
 
     fun registerChannel(ChannelName: String, Channel: BaseChannel) {
         chans[ChannelName] = Channel

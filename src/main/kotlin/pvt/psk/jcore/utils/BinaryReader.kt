@@ -2,9 +2,9 @@ package pvt.psk.jcore.utils
 
 import kotlinx.coroutines.io.*
 import java.io.*
-import kotlin.experimental.*
-import java.util.UUID
 import java.nio.*
+import java.util.*
+import kotlin.experimental.*
 
 class BinaryReader {
 
@@ -36,11 +36,11 @@ class BinaryReader {
 
     fun readUUID(): UUID = readBytes(16).toUUID()
 
-    fun ReadString(): String = String(CharArray(read7BitEncodedInt()) { readChar() })
+    fun readString(): String = String((readBytes(read7BitEncodedInt())), Charsets.UTF_8)
 
     fun readByte(): Byte = baseStream!!.read().toByte()
 
-    fun readBytes(count: Int): ByteArray = ByteArray(count) { readByte() }
+    fun readBytes(count: Int): ByteArray = ByteArray(count).also { baseStream!!.read(it) }
 
     fun readChar(): Char = readByte().toChar()
 

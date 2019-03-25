@@ -12,6 +12,8 @@ import pvt.psk.jcore.host.*
  */
 abstract class PeerCommand(val CommandID: CommandID, fromHost: HostID, toHost: HostID) : DirectedMessage(fromHost, toHost) {
 
+    var sequence : Int = 0
+
     private val _ct = CompletableDeferred<Unit>()
 
     val completion: Deferred<Unit>

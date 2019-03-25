@@ -1,7 +1,5 @@
 package pvt.psk.jcore.administrator
 
-import kotlinx.atomicfu.*
-import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.peerCommands.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.channel.commands.*
@@ -19,10 +17,18 @@ abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, va
 
     val logCat: String = "Peer"
 
-    data class HostData(var lastSequenceID: Int)
+    class HostData {
+        val lastIds = ConcurrentHashMap<CommandID, Int>()
+
+        init {
+            lastIds[CommandID.Discovery] = 0
+            lastIds[CommandID.HostInfo] = 0
+            lastIds[CommandID.Ping] = 0
+            lastIds[CommandID.PingReply] = 0
+        }
+    }
 
     private val hosts = ConcurrentHashMap<HostID, HostData>()
-    private val curseqid = atomic(1)
     private val _chans = Hashtable<String, HashSet<HostID>>()
 
     @Suppress("MemberVisibilityCanBePrivate")
@@ -148,25 +154,26 @@ abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, va
      */
     fun filter(command: PeerCommand): Boolean {
 
-        if (command !is HostInfoCommand)
+        val fh = command.fromHost
+
+        if (command.CommandID >= CommandID.EndOfList)
             return true
 
-        var isHostKnown: Boolean
-
         synchronized(hosts) {
-            var hd = hosts.get(command.fromHost)
-            isHostKnown = hd != null
+            var hd = hosts[fh]
 
-            if (!isHostKnown) {
-                hd = HostData(command.sequenceID)
-                hosts[command.fromHost] = hd
-            } else if (command.sequenceID <= hd!!.lastSequenceID) {
-                logger?.writeLog(LogImportance.Trace, logCat,
-                                 "Команда $command проигнорирована из-за значения SeqID=${command.sequenceID} <= ${hd.lastSequenceID}")
-                return false
+            if (hd == null) {
+                hd = HostData()
+                hosts[fh] = hd
             }
 
-            hd.lastSequenceID = command.sequenceID
+            if (command is HostInfoCommand && command.sequence <= hd.lastIds[command.CommandID] ?: 0)
+                return false
+
+            if (command.sequence == hd.lastIds[command.CommandID])
+                return false
+
+            hd.lastIds[command.CommandID] = command.sequence
         }
 
         return true
@@ -184,7 +191,7 @@ abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, va
 
         Control.sendMessage(np)
 
-        Control.sendMessage(np.createHostInfoCommand(curseqid.incrementAndGet(), selfHostID, toHost))
+        Control.sendMessage(np.createHostInfoCommand(selfHostID, toHost))
     }
 
     fun adjustTargetHost(From: HostID, To: HostID): Pair<Boolean, HostID> {
@@ -209,8 +216,7 @@ abstract class PeerProtocol(val selfHostID: HostID, controlChannel: IChannel, va
      * Обработка команды PingCommand
      * Отправляет в ответ команду PingReplyCommand
      */
-    private fun onPing(Ping: PingCommand) = Control.sendMessage(
-            PingReplyCommand(HostID.Local, Ping.fromHost, Ping.token))
+    private fun onPing(Ping: PingCommand) = Control.sendMessage(Ping.getReply())
 
     /**
      * Обработка команды PingReplyCommand

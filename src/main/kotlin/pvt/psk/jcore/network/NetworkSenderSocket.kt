@@ -1,6 +1,5 @@
 package pvt.psk.jcore.network
 
-import io.ktor.util.*
 import kotlinx.coroutines.*
 import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
@@ -42,7 +41,7 @@ class NetworkSenderSocket(private val selfId: HostID, controlBus: IChannel, canc
 
         logger?.writeLog(LogImportance.Info, logCat, "Открыт UDP сокет по адресу ${udp.localEndPoint}")
 
-        controlBus.getChannel(::onCmd);
+        controlBus.getChannel(::onCmd)
 
         //tcp = aSocket(ActorSelectorManager(Dispatchers.IO)).tcp().bind(InetSocketAddress("::", 0))
         //launch(Dispatchers.IO) { beginAccept() } <- for stream over tcp
@@ -122,6 +121,13 @@ class NetworkSenderSocket(private val selfId: HostID, controlBus: IChannel, canc
      */
     fun register(networkEndPoint: NetworkEndPoint) {
         _epmap[networkEndPoint.targetHost] = networkEndPoint
+    }
+
+    /**
+     * Разрегистрирует конечную точку
+     */
+    fun unregister(networkEndPoint: NetworkEndPoint) {
+        _epmap.remove(networkEndPoint.targetHost)
     }
 
     /**
@@ -210,10 +216,13 @@ class NetworkSenderSocket(private val selfId: HostID, controlBus: IChannel, canc
 
         val ep = resolve(from).await() ?: return
 
+        @Suppress("UNCHECKED_CAST")
+        val t = fmt.deserialize(reader) as? Array<String>?
+
         fmt.deserialize(reader) // metadata
         val d = fmt.deserialize(reader) as ByteArray
 
-        ep.onReceived(BytesPacket(d, ep.targetHost, HostID.Local))
+        ep.onReceived(BytesPacket(d, ep.targetHost, HostID.Local).apply { tags = t })
     }
 
     /**
@@ -233,6 +242,7 @@ class NetworkSenderSocket(private val selfId: HostID, controlBus: IChannel, canc
 
         wr.write(PacketID.Datagram.id.toByte()) // Маркер байтовой посылки
 
+        fmt.serialize(wr, data.tags)
         fmt.serialize(wr, data.metadata) // Метаданные
         fmt.serialize(wr, d)             // Данные
 

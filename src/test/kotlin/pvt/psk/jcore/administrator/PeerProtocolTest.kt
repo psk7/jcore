@@ -1,4 +1,4 @@
-@file:Suppress("UNUSED_PARAMETER", "UNUSED_VARIABLE", "NAME_SHADOWING", "UNCHECKED_CAST")
+@file:Suppress("UNUSED_PARAMETER", "UNUSED_VARIABLE", "NAME_SHADOWING", "UNCHECKED_CAST", "UNUSED_ANONYMOUS_PARAMETER")
 
 package pvt.psk.jcore.administrator
 
@@ -10,6 +10,8 @@ import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.channel.commands.*
 import pvt.psk.jcore.host.*
 import pvt.psk.jcore.logger.*
+import pvt.psk.jcore.network.*
+import pvt.psk.jcore.network.commands.*
 import pvt.psk.jcore.utils.*
 import java.net.*
 import java.util.*
@@ -21,14 +23,14 @@ private class TestPeerProtocol(selfHostID: HostID, controlChannel: IChannel, log
     override fun createPollCommand(): PollCommand = TestPollCommand(selfHostID)
 }
 
-private class TestHostInfoCommand(SequenceID: Int, FromHost: HostID, endPoints: Array<EndPointInfo>, ToHost: HostID,
+private class TestHostInfoCommand(FromHost: HostID, endPoints: Array<EndPointInfo>, ToHost: HostID,
                                   vararg payload: Array<Any>) :
-        HostInfoCommand(SequenceID, FromHost, endPoints, ToHost, *payload) {
+        HostInfoCommand(FromHost, endPoints, ToHost, *payload) {
 }
 
 private class TestPollCommand(ToHost: HostID) : PollCommand() {
-    override fun createHostInfoCommand(SeqID: Int, FromHost: HostID, ToHost: HostID): HostInfoCommand {
-        return TestHostInfoCommand(SeqID, FromHost, arrayOf(), ToHost)
+    override fun createHostInfoCommand(FromHost: HostID, ToHost: HostID): HostInfoCommand {
+        return TestHostInfoCommand(FromHost, arrayOf(), ToHost)
     }
 }
 
@@ -192,28 +194,28 @@ class PeerProtocolTest {
                                   }
                               })
 
-        val ep1 = EndPointInfo(rh1, "Chan1", false)
-        val ep2 = EndPointInfo(rh2, "Chan2", false)
-        val ep3 = EndPointInfo(rh2, "Chan1", false)
-        val ep4 = EndPointInfo(rh3, "Chan1", false)
-        val ep5 = EndPointInfo(rh1, "Chan3", false)
+        val ep1 = EndPointInfo(rh1, "Chan1", arrayOf())
+        val ep2 = EndPointInfo(rh2, "Chan2", arrayOf())
+        val ep3 = EndPointInfo(rh2, "Chan1", arrayOf())
+        val ep4 = EndPointInfo(rh3, "Chan1", arrayOf())
+        val ep5 = EndPointInfo(rh1, "Chan3", arrayOf())
 
         // Добавлен rh1 в канал Chan1
-        dc.sendMessage(HostInfoCommand(++seq, rh1, arrayOf(ep1), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh1, arrayOf(ep1), HostID.Local))
 
         var cmd = lst.tryGetMessage<NewHostInChannelCommand>()
         assertEquals(rh1, cmd.endPointInfo.target)
         assertEquals("Chan1", cmd.endPointInfo.channelName)
 
         // Добавлен rh2 в канал Chan2
-        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(ep2), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh2, arrayOf(ep2), HostID.Local))
 
         cmd = lst.tryGetMessage()
         assertEquals(rh2, cmd.endPointInfo.target)
         assertEquals("Chan2", cmd.endPointInfo.channelName)
 
         // Повторим предыдущую команду
-        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(ep2), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh2, arrayOf(ep2), HostID.Local))
 
         // Должно прийти обновление канала
         var cmdu = lst.tryGetMessage<UpdateHostInChannelCommand>()
@@ -221,7 +223,7 @@ class PeerProtocolTest {
         assertEquals("Chan2", cmdu.endPointInfo.channelName)
 
         // Добавлен rh2 в канал Chan1
-        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(ep2, ep3), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh2, arrayOf(ep2, ep3), HostID.Local))
 
         cmdu = lst.tryGetMessage()
         assertEquals(rh2, cmdu.endPointInfo.target)
@@ -231,14 +233,14 @@ class PeerProtocolTest {
         assertEquals("Chan1", cmd.endPointInfo.channelName)
 
         // Добавлен rh3 в канал Chan1
-        dc.sendMessage(HostInfoCommand(++seq, rh3, arrayOf(ep4), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh3, arrayOf(ep4), HostID.Local))
 
         cmd = lst.tryGetMessage()
         assertEquals(rh3, cmd.endPointInfo.target)
         assertEquals("Chan1", cmd.endPointInfo.channelName)
 
         // rh2 вышел из всех каналов
-        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh2, arrayOf(), HostID.Local))
 
         var cmdl = lst.tryGetMessage<HostLeaveChannelCommand>()
         assertEquals(rh2, cmdl.leavedHost)
@@ -248,13 +250,13 @@ class PeerProtocolTest {
         assertEquals("Chan1", cmdl.channel)
 
         // Повторим предыдущую команду
-        dc.sendMessage(HostInfoCommand(++seq, rh2, arrayOf(), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh2, arrayOf(), HostID.Local))
 
         // Ничего не должно произойти
         assertTrue(lst.isEmpty())
 
         // rh1 вышел из Chan1 и зашел в Chan3
-        dc.sendMessage(HostInfoCommand(++seq, rh1, arrayOf(ep5), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh1, arrayOf(ep5), HostID.Local))
         cmd = lst.tryGetMessage()
         assertEquals(rh1, cmd.endPointInfo.target)
         assertEquals("Chan3", cmd.endPointInfo.channelName)
@@ -263,11 +265,93 @@ class PeerProtocolTest {
         assertEquals("Chan1", cmdl.channel)
 
         // rh1 вышел из всех каналов
-        dc.sendMessage(HostInfoCommand(++seq, rh1, arrayOf(), HostID.Local))
+        dc.sendMessage(HostInfoCommand(rh1, arrayOf(), HostID.Local))
         cmdl = lst.tryGetMessage()
         assertEquals(rh1, cmdl.leavedHost)
         assertEquals("Chan3", cmdl.channel)
 
         assertTrue(lst.isEmpty())
+    }
+
+    @Test
+    fun sequenceHostInfoCommand() {
+        val l = TestLogger("P1")
+        val r = Router()
+
+        val hid = HostID(UUID.randomUUID(), "Host")
+        val rh1 = HostID(UUID.randomUUID(), "Remote1")
+
+        var pp = NetworkPeerProtocol(hid, r, l)
+
+        var f = false
+
+        val dc = r.getChannel({ p, m -> f = true; })
+
+        val ep1 = EndPointInfo(hid, "Chan1", arrayOf())
+
+        fun GetHIC(Sid: Int): HostInfoCommand {
+            val hic = HostInfoCommand(rh1, arrayOf(ep1), HostID.Local)
+            hic.sequence = Sid
+
+            return hic
+        }
+
+        fun T(Sid: Int, F: Boolean) {
+            val h = GetHIC(Sid)
+            dc.sendMessage(h)
+            runBlocking { h.completion.join() }
+            assertEquals(F, f)
+            f = false
+        }
+
+        T(1, true)
+        T(2, true)
+        T(3, true)
+        T(3, false)
+        T(5, true)
+        T(5, false)
+        T(2, false)
+        T(4, false)
+    }
+
+    @Test
+    fun sequenceHostDiscovery() {
+        val l = TestLogger("P1")
+        val r = Router()
+
+        val hid = HostID(UUID.randomUUID(), "Host")
+        var rh1 = HostID(UUID.randomUUID(), "Remote1")
+
+        var pp = NetworkPeerProtocol(hid, r, l)
+
+        var f = false
+
+        val dc = r.getChannel({ p, m -> f = true; })
+
+        var ep1 = EndPointInfo(hid, "Chan1", arrayOf())
+
+        fun GetCmd(Sid: Int): PeerCommand {
+            val hic = NetworkPingCommand(hid, HostID.Local, AckToken(), InetSocketAddress(Inet6Address.getLoopbackAddress(), 123))
+            hic.sequence = Sid
+
+            return hic
+        }
+
+        fun T(Sid: Int, F: Boolean) {
+            val h = GetCmd(Sid)
+            dc.sendMessage(h)
+            runBlocking { h.completion.join() }
+            assertEquals(F, f)
+            f = false
+        }
+
+        T(1, true)
+        T(2, true)
+        T(3, true)
+        T(5, true)
+        T(5, false)
+        T(2, true)
+        T(4, true)
+        T(4, false)
     }
 }

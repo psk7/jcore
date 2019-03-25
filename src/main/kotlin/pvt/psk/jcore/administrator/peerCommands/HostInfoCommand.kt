@@ -5,15 +5,13 @@ import pvt.psk.jcore.host.*
 /**
  * Команда - информация о каналах хоста
  *
- * @param sequenceID - порядковый номер команды
  * @param FromHost - Идентификатор хоста, информация о котором содержится в команте
  * @param ToHost - Идетификатор хоста - получателя команды
  * @param endPoints - Список конечных точек каналов хоста отправителя команды
  * @param payload - Дополнительная информация о хосте
  */
-open class HostInfoCommand(val sequenceID: Int, FromHost: HostID, val endPoints: Array<EndPointInfo>, ToHost: HostID,
-                           vararg val payload: Any) :
+open class HostInfoCommand(FromHost: HostID, val endPoints: Array<EndPointInfo>, ToHost: HostID, vararg val payload: Any) :
         PeerCommand(CommandID.HostInfo, FromHost, ToHost) {
 
-    override fun toString(): String = "HostInfo: From $fromHost, SeqID=$sequenceID"
+    override fun toString(): String = "HostInfo: From $fromHost, SeqID=$sequence"
 }

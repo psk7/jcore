@@ -6,12 +6,14 @@ import pvt.psk.jcore.channel.*
 import pvt.psk.jcore.host.*
 import java.net.*
 
-class NetworkEndPoint(dataChannel: IChannel, sender: ISender, targetHost: HostID,
+class NetworkEndPoint(dataChannel: IChannel,
+                      private val sender: ISender,
+                      targetHost: HostID,
                       private val directory: IPAddressDirectory,
                       private val port: Int,
-                      var dontSendTo: Boolean = false,
+                      acceptTags: Array<String>?,
                       canReceiveStream: Boolean = false)
-    : EndPoint(dataChannel, sender, targetHost, canReceiveStream) {
+    : EndPoint(dataChannel, sender, targetHost, acceptTags, canReceiveStream) {
 
     val target: InetSocketAddress?
         get() {
@@ -24,5 +26,11 @@ class NetworkEndPoint(dataChannel: IChannel, sender: ISender, targetHost: HostID
         (sender as? NetworkSenderSocket)?.register(this)
     }
 
-    override fun toString(): String = "$targetHost$target(${if (dontSendTo) "*" else ""})"
+    override fun close() {
+        super.close()
+
+        (sender as? NetworkSenderSocket)?.unregister(this)
+    }
+
+    override fun toString(): String = "$targetHost$target Accept:${acceptTags?.joinToString(",") ?: ""}"
 }

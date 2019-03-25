@@ -7,4 +7,6 @@ import java.net.*
 
 class NetworkPingCommand(fromHost: HostID, toHost: HostID, token: AckToken, val from: InetSocketAddress?) : PingCommand(fromHost, toHost, token) {
 
+
+    override fun getReply(): PingReplyCommand = NetworkPingReplyCommand(HostID.Local, fromHost, token, from)
 }
