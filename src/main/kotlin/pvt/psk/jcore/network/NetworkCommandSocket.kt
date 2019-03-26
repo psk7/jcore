@@ -86,12 +86,8 @@ class NetworkCommandSocket(Bus: IChannel,
         }
 
         launch {
-            scanLock.lock()
-
-            try {
+            scanLock.withLock {
                 scanSync()
-            } finally {
-                scanLock.unlock()
             }
         }
     }
@@ -114,7 +110,7 @@ class NetworkCommandSocket(Bus: IChannel,
             // Добавляем широковещательный сокет во multicast группы на всех интерфейсах
             socketExceptionSafe { _mcsocket.joinGroup(InetSocketAddress(mca, admPort), it) }
 
-            val mp = if (it.name.contains("wifi", true)) 3 else 1       // Мультпликатор отправки
+            val mp = if (it.name.contains("wifi", true)) 3 else 1       // Мультипликатор отправки
 
             val u = SafeUdpClient(InetSocketAddress("::", 0), CancellationToken, false, mp, received = ::received)
 
@@ -222,7 +218,8 @@ class NetworkCommandSocket(Bus: IChannel,
                 val ba = ByteArray(l)
                 dp.data.copyInto(ba, endIndex = l)
 
-                GlobalScope.launch(Dispatchers.IO) { received(ba, dp.socketAddress as InetSocketAddress) }
+                // Запуск в GlobalScope чтобы обработчик пакета не стал дочерней задачей
+                GlobalScope.launch { received(ba, dp.socketAddress as InetSocketAddress) }
             }
         }
     }

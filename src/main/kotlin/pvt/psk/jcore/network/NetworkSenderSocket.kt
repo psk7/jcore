@@ -81,19 +81,17 @@ class NetworkSenderSocket(private val selfId: HostID, controlBus: IChannel, canc
      * @param from Отправитель пакета данных
      */
     private fun udpReceived(bytes: ByteArray, from: InetSocketAddress) {
-        launch {
-            val rd = BinaryReader(bytes)
+        val rd = BinaryReader(bytes)
 
-            val b = rd.readByte()
+        val b = rd.readByte()
 
-            val pid = PacketID.values().find { it.id == b.toInt() }
+        val pid = PacketID.values().find { it.id == b.toInt() }
 
-            when (pid) {
-                PacketID.Datagram -> receiveDatagram(rd, from)
-                PacketID.Ping -> ping(rd, from)
-                PacketID.PingReply -> pingReply(rd, from)
-                else -> {
-                }
+        when (pid) {
+            PacketID.Datagram -> launch { receiveDatagram(rd, from) }
+            PacketID.Ping -> ping(rd, from)
+            PacketID.PingReply -> pingReply(rd, from)
+            else -> {
             }
         }
     }

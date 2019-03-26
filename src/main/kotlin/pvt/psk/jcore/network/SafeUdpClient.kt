@@ -2,6 +2,7 @@ package pvt.psk.jcore.network
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.io.core.*
@@ -9,18 +10,22 @@ import pvt.psk.jcore.utils.*
 import java.net.*
 import kotlin.coroutines.*
 
+private val cnt = atomic(1)
+
 class SafeUdpClient(BindEndPoint: InetSocketAddress,
                     cancellationToken: CancellationToken,
                     private val isMulticast: Boolean = false,
                     private val sendMultiplicator: Int = 1,
                     private val received: (ByteArray, InetSocketAddress) -> Unit) : CoroutineScope {
 
+    private val id = cnt.getAndIncrement()
+
     private val job = SupervisorJob()
 
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO + job
 
-    private val selector: SelectorManager = ActorSelectorManager(Dispatchers.IO + job)
+    private val selector: SelectorManager = ActorSelectorManager(Dispatchers.IO)
     private var _udp: BoundDatagramSocket? = null
     private var lbep: InetSocketAddress = BindEndPoint
 
@@ -66,7 +71,8 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
                 val ba = ByteArray(rp!!.packet.remaining.toInt())
                 rp.packet.readAvailable(ba)
 
-                launch { received(ba, rp.address as InetSocketAddress) }
+                // Запуск в GlobalScope чтобы обработчик пакета не стал дочерней задачей
+                GlobalScope.launch { received(ba, rp.address as InetSocketAddress) }
             } catch (e: ClosedReceiveChannelException) {
                 break
             }
@@ -108,5 +114,5 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
         socketExceptionSafe { _udp?.close() }
     }
 
-    override fun toString(): String = "UDP: ${_udp?.localAddress}"
+    override fun toString(): String = "UDP #$id: ${_udp?.localAddress}"
 }
