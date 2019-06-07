@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "pvt.psk"
-version = "1.0.1-rc2"
+version = "1.0.1"
 
 repositories {
     mavenCentral()

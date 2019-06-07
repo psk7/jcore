@@ -68,7 +68,12 @@ class SafeUdpClient(BindEndPoint: InetSocketAddress,
             try {
                 val rp = _udp?.receive()
 
-                val ba = ByteArray(rp!!.packet.remaining.toInt())
+                if (rp == null) {
+                    delay(100)
+                    continue
+                }
+
+                val ba = ByteArray(rp.packet.remaining.toInt())
                 rp.packet.readAvailable(ba)
 
                 // Запуск в GlobalScope чтобы обработчик пакета не стал дочерней задачей
