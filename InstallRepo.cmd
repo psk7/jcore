@@ -1,3 +1,3 @@
-gradlew clean install
+gradlew clean publishToMavenLocal
 
 pause
