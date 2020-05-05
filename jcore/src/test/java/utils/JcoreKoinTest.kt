@@ -4,7 +4,7 @@ import org.junit.jupiter.api.extension.*
 import org.koin.test.*
 import pvt.psk.jcore.*
 
-open class JcoreKoinTest : KoinTest {
+abstract class JcoreKoinTest : KoinTest {
 
     @JvmField
     @RegisterExtension

@@ -9,6 +9,14 @@ private val cnt = atomic((UUID.randomUUID().hashCode().toLong() shl 32))
 
 class AckToken {
 
+    companion object {
+        val empty = AckToken(0)
+    }
+
+    private constructor(id: Long) {
+        ID = id
+    }
+
     constructor() {
         ID = cnt.incrementAndGet()
     }

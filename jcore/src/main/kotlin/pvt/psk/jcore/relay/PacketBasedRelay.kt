@@ -3,7 +3,6 @@ package pvt.psk.jcore.relay
 import kotlinx.coroutines.*
 import pvt.psk.jcore.administrator.*
 import pvt.psk.jcore.channel.*
-import pvt.psk.jcore.logger.*
 import pvt.psk.jcore.utils.*
 import java.io.*
 
@@ -17,10 +16,11 @@ abstract class PacketBasedRelay<T>(relayID: RelayID) : BaseRelay(relayID) {
     private enum class PacketType(val id: Int) {
         Reply(1),
         RelayInfo(2),
-        Serialized(3),
-        Datagram(4),
-        DatagramOverStream(5),
-        Stream(6);
+        RelayInfoReply(3),
+        Serialized(4),
+        Datagram(5),
+        DatagramOverStream(6),
+        Stream(7);
 
         companion object {
             fun fromInt(value: Int) = PacketType.values().first { it.id == value }
@@ -37,47 +37,48 @@ abstract class PacketBasedRelay<T>(relayID: RelayID) : BaseRelay(relayID) {
     /**
      * Упаковка сообщений в поток байтов
      *
-     * @param Message Упаковываемое сообщение
+     * @param message Упаковываемое сообщение
      * @param writer Поток, в который производится упаковка
      *
      * @return Признак успешно проведенной упаковки
      */
-    protected fun serialize(Message: RelayMessage, writer: BinaryWriter): Boolean {
+    protected fun serialize(message: RelayMessage, writer: BinaryWriter): Boolean {
 
         fun writePreamble() {
-            writer.write(Message.source);         // Ретранслятор отправитель
-            writer.write(Message.targetRelay);    // Ретранслятор получатель
-            writer.write(Message.ttl.toByte());   // Время жизни пакета
-
-            val rt = Message.relaysTokens;        // Список токенов ретрансляторов, через которые пакет уже прошел
-            writer.write(rt.size.toByte());
-
-            rt.forEach(writer::write)
+            writer.write(message.source)          // Ретранслятор отправитель
+            writer.write(message.targetRelay)     // Ретранслятор получатель
+            writer.write(message.ttl.toByte())    // Время жизни пакета
         }
 
         fun writeEnvelope() {
-            if (Message.payload !is RelayEnvelope)
+            if (message.payload !is RelayEnvelope)
                 return
 
-            val rre = Message.payload
+            val rre = message.payload
 
             writer.write(rre.from)
             writer.write(rre.targets)
         }
 
-        val msg = if (Message.payload is RelayEnvelope)
-            Message.payload.payload else Message.payload
+        val msg = if (message.payload is RelayEnvelope)
+            message.payload.payload else message.payload
 
         // Метки
         // Метаданные
         when (msg) {
-            is RelayInfo     -> {
+            is RelayInfo      -> {
                 writer.write(PacketType.RelayInfo.id.toByte())
                 writePreamble()
                 msg.serialize(writer)
             }
 
-            is ISerializable -> {
+            is RelayInfoReply -> {
+                writer.write(PacketType.RelayInfoReply.id.toByte())
+                writePreamble()
+                msg.serialize(writer)
+            }
+
+            is ISerializable  -> {
                 writer.write(PacketType.Serialized.id.toByte())
                 writePreamble()
                 writeEnvelope()
@@ -85,14 +86,14 @@ abstract class PacketBasedRelay<T>(relayID: RelayID) : BaseRelay(relayID) {
                     return false
             }
 
-            is BytesPacket   -> {
+            is BytesPacket    -> {
                 sendDatagram(msg, writer) {
                     writePreamble()
                     writeEnvelope()
                 }
             }
 
-            is StreamPacket  -> {
+            is StreamPacket   -> {
                 writer.write(PacketType.Stream.id.toByte())
                 writePreamble()
                 writeEnvelope()
@@ -136,10 +137,9 @@ abstract class PacketBasedRelay<T>(relayID: RelayID) : BaseRelay(relayID) {
 
         val ttl = reader.readByte().toUInt()
 
-        val tc = Array(reader.readByte()) { reader.readInt32() }.toIntArray()
-
         val rm: Any? = when (type) {
             PacketType.RelayInfo          -> readRelayInfo(reader)
+            PacketType.RelayInfoReply     -> readRelayInfoReply(reader)
             PacketType.Datagram           -> readBytesPacket(reader)
             PacketType.Stream             -> readStreamPacket(reader, From)
             PacketType.DatagramOverStream -> readDatagramOverStreamPacket(reader, From)
@@ -150,13 +150,18 @@ abstract class PacketBasedRelay<T>(relayID: RelayID) : BaseRelay(relayID) {
         if (rm == null)
             return null
 
-        return RelayMessage(srcRelay, tgtRelay, rm, ttl, tc)
+        return RelayMessage(srcRelay, tgtRelay, rm, ttl)
     }
 
     /**
      * Чтение информации о ретрансляторе
      */
     private fun readRelayInfo(reader: BinaryReader) = RelayInfo(reader)
+
+    /**
+     * Чтение ответа на передачу информации о ретрансляторе
+     */
+    private fun readRelayInfoReply(reader:BinaryReader) = RelayInfoReply(reader)
 
     /**
      * Чтение информации об отправителе/получателе пакета
@@ -286,5 +291,7 @@ abstract class PacketBasedRelay<T>(relayID: RelayID) : BaseRelay(relayID) {
     /**
      * Прием отдельного потока
      */
-    protected abstract suspend fun createStreamPacketAsync(reader: BinaryReader, formatter: Formatter, from: T): StreamPacket?
+    protected abstract suspend fun createStreamPacketAsync(reader: BinaryReader,
+                                                           formatter: Formatter,
+                                                           from: T): StreamPacket?
 }

@@ -9,9 +9,10 @@ import java.util.concurrent.*
 import kotlin.coroutines.*
 
 typealias RelayEnvelopeToUnit = (RelayEnvelope) -> Unit
-typealias RelayMessageToUnit = (RelayMessage) -> Unit
+typealias RelayMessageToBoolean = (RelayMessage) -> Boolean
 
-abstract class BaseRelay(val relayID: RelayID) : IRelay, CoroutineScope, KoinComponent {
+abstract class BaseRelay(val relayID: RelayID, routingTable: IRoutingTable? = null)
+    : IRelay, CoroutineScope, KoinComponent {
 
     protected val job: Job = SupervisorJob()
 
@@ -25,32 +26,80 @@ abstract class BaseRelay(val relayID: RelayID) : IRelay, CoroutineScope, KoinCom
 
     protected val logCat: String = "Relay"
 
-    private val links = RelayLinksDirectory()
     private val onRouteChangedNotifiers = ConcurrentHashMap<HostID, () -> Unit>()
+
+    private val adjHosts = ConcurrentHashMap<HostID, RelayEnvelopeToUnit>()
+    private val adjRelays = ConcurrentHashMap<RelayID, RelayMessageToBoolean>()
+
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun RelayID?.sink(message: RelayMessage): Boolean {
+        return adjRelays[this ?: return false]?.invoke(message) ?: return false
+    }
+
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun HostID?.sink(message: RelayEnvelope) {
+        adjHosts[this ?: return]?.invoke(message)
+    }
 
     init {
         logger.writeLog(LogImportance.Trace, logCat, "Создан ретранслятор $relayID")
     }
 
+    /**
+     * Список граничащих ретрансляторов
+     */
     val adjacentRelays
-        get() = links.adjacentRelays.keys.toTypedArray()
+        get() = adjRelays.keys.toTypedArray()
 
+    /**
+     * Список присоединенных хостов
+     */
+    val adjacentHosts
+        get() = adjHosts.keys.toTypedArray()
+
+    /**
+     * Список хостов за исключением локальных
+     */
     val remoteHosts
-        get() = links.remoteHosts
+        get() = (routingTable.hosts - adjHosts.keys).toTypedArray()
+
+    protected val adjacentRelayReceiveRelayInfoConfirm = RevisionEnsurator(::sendRelayInfo, 60.seconds)
+
+    protected val routingTable: IRoutingTable = routingTable ?: RoutingTable(relayID)
 
     override fun addAdjacentHost(id: HostID, sink: (RelayEnvelope) -> Unit, onRouteChanged: (() -> Unit)?) {
+        if (adjHosts.putIfAbsent(id, sink) == null) {
+            if (onRouteChanged != null)
+                onRouteChangedNotifiers[id] = onRouteChanged
 
-        if (onRouteChanged != null)
-            onRouteChangedNotifiers[id] = onRouteChanged
+            routingTable.updateRelayInfo(adjacentHosts, adjacentRelays)
 
-        if (links.addAdjacentHost(id, sink))
-            sendRelayInfo()
+            adjacentRelayReceiveRelayInfoConfirm.bumpRevision()
+        }
+
+        ensureAdjacentRelaysHasLatestConfiguration()
     }
 
-    protected fun addAdjacentRelay(id: RelayID, sink: RelayMessageToUnit) {
-        links.addAdjacentRelay(id, sink)
+    fun removeAdjacentHost(id: HostID) {
+        if (adjHosts.remove(id) != null) {
+            routingTable.updateRelayInfo(adjacentHosts, adjacentRelays)
 
-        onRouteChangedNotifiers.forEach { it.value() }
+            adjacentRelayReceiveRelayInfoConfirm.bumpRevision()
+        }
+
+        ensureAdjacentRelaysHasLatestConfiguration()
+    }
+
+    protected fun addAdjacentRelay(id: RelayID, sink: RelayMessageToBoolean) {
+        if (adjRelays.putIfAbsent(id, sink) == null) {
+            routingTable.updateRelayInfo(adjacentHosts, adjacentRelays)
+
+            adjacentRelayReceiveRelayInfoConfirm.bumpRevision()
+
+            onRouteChangedNotifiers.forEach { it.value() }
+        }
+
+        ensureAdjacentRelaysHasLatestConfiguration()
     }
 
     /**
@@ -59,9 +108,16 @@ abstract class BaseRelay(val relayID: RelayID) : IRelay, CoroutineScope, KoinCom
      * @param id Идентификатор удаляемого граничащего ретранслятора
      */
     protected fun removeAdjacentRelay(id: RelayID) {
-        links.removeAdjacentRelay(id)
+        if (adjRelays.remove(id) != null) {
+            routingTable.updateRelayInfo(adjacentHosts, adjacentRelays)
+            logger.writeLog(LogImportance.Info, logCat, "Ретранслятор отключился $id")
 
-        onRouteChangedNotifiers.forEach { it.value() }
+            adjacentRelayReceiveRelayInfoConfirm.bumpRevision()
+
+            onRouteChangedNotifiers.forEach { it.value() }
+        }
+
+        ensureAdjacentRelaysHasLatestConfiguration()
     }
 
     /**
@@ -70,22 +126,25 @@ abstract class BaseRelay(val relayID: RelayID) : IRelay, CoroutineScope, KoinCom
      * В списке целей RelayEnvelope не должно быть HostID.All.
      */
     override fun send(data: RelayEnvelope) {
+        val (local, remotes) = routingTable.expand(data.from.hostID, data.targets).pickOutFirst { it.first == relayID }
 
-        val (l, r) = links.expandTarget(data.from.hostID, data.targets)
+        remotes.forEach { (relay, targets) ->
+            relay.sink(RelayMessage(relayID, relay, RelayEnvelope(data.from, targets, data.payload), 1u))
+        }
 
-        for ((sink, tgts) in l)
-            sink(RelayEnvelope(data.from, tgts, data.payload))
-
-        for ((from, sink, tgts) in r)
-            sink(RelayMessage(relayID, from, RelayEnvelope(data.from, tgts, data.payload), 1u, null))
-    }
-
-    override fun addUplinkRelay(relay: BaseRelay) {
-        addAdjacentRelay(relay.relayID) {
-            if (it.ttl <= maxTTL && it.targetRelay != relayID)
-                relay.received(RelayMessage(relayID, relay.relayID, it.payload, it.ttl, it.relaysTokens))
+        local?.second?.forEach {
+            it.hostID.sink(RelayEnvelope(data.from, local.second.filter(it.hostID), data.payload))
         }
     }
+
+    override fun addUplinkRelay(relay: BaseRelay) =
+        addAdjacentRelay(relay.relayID) r@{
+            if (it.ttl > maxTTL || it.targetRelay == relayID)
+                return@r false
+
+            relay.received(RelayMessage(relayID, relay.relayID, it.payload, it.ttl))
+            return@r true
+        }
 
     /**
      * Маршрутизация пакета, пришедшего извне, присоединенным хостам и ретрансляция далее при необходимости
@@ -93,87 +152,90 @@ abstract class BaseRelay(val relayID: RelayID) : IRelay, CoroutineScope, KoinCom
     protected fun received(message: RelayMessage) {
         // message.targetRelay всегда должен указывать на следующего получателя в цепочке пересылки
         // иначе это какой-то неправильный пакет
-        if (message.targetRelay != relayID || message.isRelayedThrough(relayID))
+        if (message.targetRelay != relayID)
             return
 
         val mp = message.payload
 
-        val l = {
-            if (mp is RelayEnvelope) {
-                for (tid in mp.targets)
-                    links.adjacentHosts[tid.hostID]?.invoke(RelayEnvelope(mp.from, mp.targets.filter(tid.hostID), mp.payload))
-            }
-        }
-
-        if (mp is RelayInfo)
-            onRelayInfo(mp, message.source, message.ttl)
-
-        if (message.ttl.toInt() > maxTTL.toInt()) {
-            executeReceivers(l, null)
+        if (mp is RelayInfo) {
+            onRelayInfo(mp)
+            return
+        } else if (mp is RelayInfoReply) {
+            adjacentRelayReceiveRelayInfoConfirm.replyReceived(mp)
             return
         }
 
-        if (mp is RelayInfo)       // Ретрансляция информации о ретрансляторе (всем окружающим за исключением отправителя)
-            for (kp in links.adjacentRelays.filter { it.key != message.source })
-                kp.value(RelayMessage(relayID, kp.key, mp, message.ttl + 1u, message.relaysTokens))
-
-        if (mp !is RelayEnvelope) {
-            executeReceivers(l, null)
+        if (mp !is RelayEnvelope)
             return
-        }
 
-        val r = {
-            for (gv in links.groupByValues(mp.targets::containsHost)) {
+        val (local, remotes) = routingTable.expand(mp.from.hostID, mp.targets).pickOutFirst { it.first == relayID }
+
+        // Ретрансляция
+        if (message.ttl.toInt() <= maxTTL.toInt()) {
+            for ((relay, targets) in remotes) {
+                if (relay == message.source) // Обратно сообщения не отправляются
+                    continue
+
                 logger.writeLog(LogImportance.Trace, logCat,
-                                "Ретрансляция $relayID->${gv.key} (From:${mp.from}, Payload:$mp)")
+                                "Ретрансляция $relayID->${relay} (From:${mp.from}, Payload:$mp)")
 
-                links.adjacentRelays[gv.key]?.invoke(RelayMessage(relayID, gv.key,
-                                                                  RelayEnvelope(mp.from, mp.targets.filterHosts(gv.value), mp.payload),
-                                                                  message.ttl + 1u, message.relaysTokens))
+                relay.sink(RelayMessage(relayID, relay, RelayEnvelope(mp.from, targets, mp.payload), message.ttl + 1u))
             }
         }
 
-        executeReceivers(l, r)
-    }
-
-    protected fun executeReceivers(locals: (() -> Unit)?, remotes: (() -> Unit)?) {
-        locals?.invoke()
-        remotes?.invoke()
+        // Отправка хостам
+        local?.second?.forEach {
+            it.hostID.sink(RelayEnvelope(mp.from, local.second.filter(it.hostID), mp.payload))
+        }
     }
 
     /**
      * Обработка информации о ретрансляторах
      */
-    private fun onRelayInfo(relayInfo: RelayInfo, id: RelayID, distance: UInt) {
-
-        if (id == relayID || relayInfo.relayID == relayID)   // Пакеты от себя или о себе отбрасываются
+    private fun onRelayInfo(relayInfo: RelayInfo) {
+        if (relayInfo.relay == relayID)   // Пакеты от себя или о себе отбрасываются
             return
 
-        var needSend = false
+        val ar = routingTable.updateRelayInfo(relayInfo)
 
-        relayInfo.adjacentHosts.forEach {
-            needSend = needSend or links.addOrUpdate(it, distance.toInt(), id)
-        }
+        val reply = RelayInfoReply(relayID, relayInfo.ack, ar)
 
-        if (needSend)
-            sendRelayInfo()
+        relayInfo.relay.sink(RelayMessage(relayID, relayInfo.relay, reply, 1U))
+
+        if (!ar)
+            return
+
+        adjacentRelayReceiveRelayInfoConfirm.bumpRevision()
+
+        ensureAdjacentRelaysHasLatestConfiguration()
+    }
+
+    private fun sendRelayInfo(relay: RelayID, token: AckToken): Boolean {
+        val sink = adjRelays[relay] ?: return false
+
+        sink(RelayMessage(relayID, relay, RelayInfo(relayID, routingTable.table, token), 1U))
+
+        return true
     }
 
     /**
-     * Отправка информации о своих присоединенных хостах всем граничащим ретрансляторам
+     * Ожидание передачи всем ретрансляторам актуальной конфигурации
+     *
+     * @return Список ретрансляторов не подтвердивших получение конфигурации за отведенное время
      */
-    fun sendRelayInfo() {
-        val ri = RelayInfo(relayID, links.adjacentHosts.keys().toList().toTypedArray(), false)
-
-        logger.writeLog(LogImportance.Trace, logCat, "Отправка информации о ретрансляторе (${links.adjacentHosts.size})")
-
-        if (links.adjacentRelays.size == 0)
-            logger.writeLog(LogImportance.Trace, logCat, "Список целей пуст в sendRelayInfo")
-
-        links.adjacentRelays.forEach {
-            it.value(RelayMessage(relayID, it.key, ri, 1U, null))
-        }
+    fun ensureAdjacentRelaysHasLatestConfiguration() = launch {
+        ensureAdjacentRelaysHasLatestConfiguration(adjacentRelays)
     }
+
+    /**
+     * Ожидание передачи всем ретрансляторам актуальной конфигурации
+     *
+     * @param relays Список ретрансляторов, получающих данные об актуальной конфигурации
+     *
+     * @return Список ретрансляторов не подтвердивших получение конфигурации за отведенное время
+     */
+    suspend fun ensureAdjacentRelaysHasLatestConfiguration(relays: Array<RelayID>): Array<RelayID> =
+        adjacentRelayReceiveRelayInfoConfirm.ensure(relays).toTypedArray()
 
     open fun close() {
         runBlocking { job.cancelAndJoin() }

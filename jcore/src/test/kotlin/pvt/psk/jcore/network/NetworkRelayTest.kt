@@ -82,7 +82,7 @@ class NetworkRelayTest : JcoreKoinTest() {
 
         r2.send(RelayEnvelope(he2, arrayOf(he1), bp));
 
-        val rb = tcssp.result
+        val rb = runBlocking { tcssp.await() }
 
         rb.forEachIndexed { i, bb -> assertEquals(b[i], bb) }
     }

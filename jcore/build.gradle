@@ -7,13 +7,41 @@ if (ext.has('jcore_version')) {
     version = "$jcore_version"
 
     apply plugin: 'maven-publish'
+    apply plugin: 'org.jetbrains.dokka'
+
+    dokka {
+        outputFormat = 'html'
+        outputDirectory = "$buildDir/javadoc"
+    }
+
+    task dokkaJar(type: Jar, dependsOn: 'dokka') {
+        classifier 'javadoc'
+        description = "Assembles Kotlin docs with Dokka"
+        group = JavaBasePlugin.DOCUMENTATION_GROUP
+        from dokka
+    }
 
     publishing {
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/psk7/jcore")
+                credentials {
+                    username = "$GITHUB_USER"
+                    password = "$GITHUB_KEY"
+                }
+            }
+        }
         publications {
             mavenJava(MavenPublication) {
                 from components.java
+                artifact(dokkaJar)
             }
         }
+    }
+
+    java {
+        withSourcesJar()
     }
 }
 
@@ -34,16 +62,20 @@ dependencies {
     testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5.6.1')
 
     testImplementation 'org.mockito:mockito-core:3.3.3'
+    testImplementation "io.mockk:mockk:1.10.0"
 }
 
-repositories {
-    mavenCentral()
-    jcenter()
+compileTestKotlin
+{
+    kotlinOptions.freeCompilerArgs = ['-Xuse-experimental=kotlinx.serialization.ImplicitReflectionSerializer,kotlinx.coroutines.ObsoleteCoroutinesApi,kotlin.ExperimentalUnsignedTypes']
+}
+
+compileKotlin {
+    kotlinOptions.freeCompilerArgs = ['-Xuse-experimental=kotlinx.serialization.ImplicitReflectionSerializer,kotlinx.coroutines.ObsoleteCoroutinesApi,kotlin.ExperimentalUnsignedTypes']
 }
 
 sourceCompatibility = "8"
 targetCompatibility = "8"
-
 
 /*compileKotlin {
     kotlinOptions {

@@ -9,6 +9,8 @@ data class TimeSpan(val milliseconds: Long) {
     fun from(date: Date): Date = this + date
 }
 
+val Int.milliseconds : TimeSpan get() = TimeSpan(this.toLong())
+
 val Int.seconds: TimeSpan get() = TimeSpan(this * 1000L)
 val Int.second: TimeSpan get() = this.seconds
 

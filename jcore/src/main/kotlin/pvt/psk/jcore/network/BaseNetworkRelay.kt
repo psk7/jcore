@@ -16,7 +16,7 @@ enum class AddressFamily {
 abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketAddress>(relayID) {
 
     interface UdpClientFactory {
-        fun create(bindEndPoint: InetSocketAddress, received: (ByteArray, InetSocketAddress) -> Unit) : SafeUdpClient
+        fun create(bindEndPoint: InetSocketAddress, received: (ByteArray, InetSocketAddress) -> Unit): SafeUdpClient
     }
 
     protected val udpFactory: UdpClientFactory by inject()
@@ -87,15 +87,12 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
             addAdjacentRelay(relayID, ::send)
 
             sendHello(arrayOf(from))
-
-            sendRelayInfo()
         } else {
             if (known.any { it == this.relayID })
                 return
 
             // Если отправитель не знает этот ретранслятор - ему отправляется Hello в ответ
             sendHello(arrayOf(from))
-            sendRelayInfo()
         }
 
         debugHolder.remotes = relays.values.toTypedArray()
@@ -119,22 +116,36 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
     /**
      * Отправка сообщения в сеть
      *
-     * @param Message Отправляемое сообщение
+     * @param message Отправляемое сообщение
      */
-    protected fun send(message: RelayMessage) {
-
-        if (message.isRelayedThrough(message.targetRelay))
-            return
+    protected fun send(message: RelayMessage): Boolean {
+        if (message.source == message.targetRelay) // Обратно пакет не отправляется
+            return false
 
         if (message.payload is RelayEnvelope && message.payload.targets.isEmpty())
-            return
+            return false
 
-        val ep = relays.tryGetValue(message.targetRelay) ?: return
+        val ep = relays.tryGetValue(message.targetRelay) ?: return false
 
         val wr = BinaryWriter()
 
-        if (serialize(message, wr))
-            sendDatagram(wr.toArray(), ep)
+        if (!serialize(message, wr))
+            return false
+
+        sendDatagramRepeatedly(message, wr.toArray(), ep)
+        return true
+    }
+
+    /**
+     * Перегрузка этого метода может отправлять сообщение многократно при необходимости
+     *
+     * @param message Исходное сообщение
+     * @param serializedMessage Сериализованное сообщение
+     * @param to Получатель сообщения
+     */
+    protected open fun sendDatagramRepeatedly(message: RelayMessage, serializedMessage: ByteArray,
+                                              to: InetSocketAddress) {
+        sendDatagram(serializedMessage, to)
     }
 
     /**
@@ -146,10 +157,9 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
     protected abstract fun sendDatagram(data: ByteArray, target: InetSocketAddress)
 
     protected fun sendStreamPassive(packet: StreamPacket, callbackPort: Int): (BinaryWriter) -> Unit {
+        val tk = registerAckToken()
 
-        val (tk, t) = register<Pair<NetworkInputStream, NetworkOutputStream>>(CancellationToken.None)
-
-        packet.addTargetStream(async { t.await().second })
+        packet.addTargetStream(async { tk.await<Pair<NetworkInputStream, NetworkOutputStream>>()?.second })
 
         return { wr ->
             wr.write(true)
@@ -159,17 +169,15 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
     }
 
     protected fun sendStreamActive(packet: StreamPacket): (BinaryWriter) -> Unit {
-        val (token, tk) = register<Pair<InetSocketAddress, BinaryReader>>()
+        val token = registerAckToken()
 
         val stream = async {
-            val p = tk.await()
-
-            val rd = p.second
+            val (from, rd) = token.await<Pair<InetSocketAddress, BinaryReader>>() ?: return@async null
 
             val tkr = AckToken(rd)
             val port = rd.readUInt16()
 
-            connectTcpToWrite(p.first.address, port.toInt(), tkr)
+            connectTcpToWrite(from.address, port.toInt(), tkr)
         }
 
         packet.addTargetStream(stream)
@@ -180,13 +188,15 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
         }
     }
 
-    override suspend fun createStreamPacketAsync(reader: BinaryReader, formatter: Formatter, from: InetSocketAddress): StreamPacket? {
+    override suspend fun createStreamPacketAsync(reader: BinaryReader,
+                                                 formatter: Formatter,
+                                                 from: InetSocketAddress): StreamPacket? {
 
         val tag = PacketTag(reader)
         val mtd = formatter.deserialize(reader) as Array<Any>?
 
         val rm = when (reader.readByte() != 0) {
-            true -> {
+            true  -> {
                 val callbackPort = reader.readUInt16()
                 val token = AckToken(reader)
 
@@ -204,18 +214,23 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
     /**
      * Прием отдельного потока из сети
      */
-    protected suspend fun receiveStreamActive(metadata: Array<Any>?, port: Int, token: AckToken, from: InetSocketAddress): StreamPacket? {
+    protected suspend fun receiveStreamActive(metadata: Array<Any>?,
+                                              port: Int,
+                                              token: AckToken,
+                                              from: InetSocketAddress): StreamPacket? {
         val ns = connectTcpToRead(from.address, port, token) ?: return null
 
         return StreamPacket(metadata).apply { sourceStream = ns }
     }
 
-    protected suspend fun receiveStreamPassive(metadata: Array<Any>?, token: AckToken, from: InetSocketAddress): StreamPacket? {
+    protected suspend fun receiveStreamPassive(metadata: Array<Any>?,
+                                               token: AckToken,
+                                               from: InetSocketAddress): StreamPacket? {
         val wr = BinaryWriter()
 
         serializeReply(token, wr)
 
-        val (ntk, t) = register<Pair<NetworkInputStream, NetworkOutputStream>>()
+        val ntk = registerAckToken()
 
         wr.write(ntk)
 
@@ -223,7 +238,9 @@ abstract class BaseNetworkRelay(relayID: RelayID) : PacketBasedRelay<InetSocketA
 
         sendDatagram(wr.toArray(), from)
 
-        return StreamPacket(metadata).apply { sourceStream = t.await().first }
+        return StreamPacket(metadata).apply {
+            sourceStream = ntk.await<Pair<NetworkInputStream, NetworkOutputStream>>()?.first ?: return null
+        }
     }
 
     protected open fun serializeTcpListenerPort(writer: BinaryWriter) {}

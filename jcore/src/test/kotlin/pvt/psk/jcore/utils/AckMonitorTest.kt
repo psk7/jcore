@@ -9,33 +9,25 @@ import org.junit.jupiter.api.Assertions.*
 class AckMonitorTest {
     @Test
     fun Test() = runBlocking {
-        val (tk, j) = register<BinaryReader>()
+        val tk = registerAckToken()
 
         val br = BinaryReader(byteArrayOf())
 
         launch { tk.received(br) }
 
-        val z = j.await()
+        val z = tk.await<BinaryReader>()
 
         assertSame(br, z)
     }
 
     @Test
     fun timeOut() {
-        val (tk, j) = register<BinaryReader>(10)
+        val tk = registerAckToken(10)
 
         try {
-            j.wait()
-        } catch (e: Exception) {
+            runBlocking { tk.await<BinaryReader>() }
         }
-    }
-
-    @Test
-    fun cancelSafeAwait() {
-        val (tk, j) = register<BinaryReader>(10)
-
-        runBlocking {
-            assertNull(j.cancelSafeAwait())
+        catch (e: Exception) {
         }
     }
 }

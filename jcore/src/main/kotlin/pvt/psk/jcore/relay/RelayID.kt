@@ -8,15 +8,20 @@ import java.util.*
  *
  * @param id Идентификатор ретранслятора сообщений
  */
-class RelayID(val id: Int) {
+class RelayID(val id: Int) : Comparable<RelayID> {
 
     companion object {
         fun new() = RelayID(UUID.randomUUID())
+
+        val Unknown = RelayID(0)
     }
 
     constructor(id: UUID) : this(id.hashCode())
 
     constructor(reader: BinaryReader) : this(reader.readInt32())
+
+    val isUnknown
+        get() = id == 0
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -34,4 +39,6 @@ class RelayID(val id: Int) {
     fun write(writer: BinaryWriter) = writer.write(id)
 
     override fun toString(): String = "<$id>"
+
+    override fun compareTo(other: RelayID): Int = id.compareTo(other.id)
 }

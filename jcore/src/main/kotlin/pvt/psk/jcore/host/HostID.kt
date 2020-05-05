@@ -6,7 +6,7 @@ import java.util.*
 /**
  * Уникальный идентификатор хоста
  */
-class HostID {
+class HostID : Comparable<HostID> {
 
     /**
      * Уникальный идентификатор хоста.
@@ -60,6 +60,8 @@ class HostID {
     }
 
     override fun hashCode(): Int = id
+
+    override fun compareTo(other: HostID): Int = id.compareTo(other.id)
 
     override fun toString(): String = "<$id>"
 
